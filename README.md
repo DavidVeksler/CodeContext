@@ -1,6 +1,7 @@
 # CodeContext
 
-CodeContext is an efficient C# application designed to provide code context to Language Learning Models (LLMs). It scans project directories, generates a structured representation of the project, and extracts relevant file contents while intelligently filtering out unnecessary files and directories.
+CodeContext is an C# application designed to provide code context to Language Learning Models (LLMs). 
+It scans project directories, generates a structured representation of the project, and extracts relevant file contents while intelligently filtering out unnecessary files and directories.
 
 ## Features
 
