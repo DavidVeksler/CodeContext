@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Text;
+using CodeContext;
 
 var path = args.Length > 0 ? args[0] : MyAppsContext.GetUserInput("Enter the path to index: ");
 var defaultOutput = Path.Combine(Path.GetDirectoryName(path), "context.txt");
