@@ -1,64 +1,48 @@
-﻿using System.Text;
-
-namespace CodeContext;
-
-public class MyAppsContext
+﻿namespace CodeContext
 {
-    private static string _gitRepoRootPath;
-
-    public static string GetUserInput(string prompt)
+    public class MyAppsContext
     {
-        Console.Write(prompt);
-        return Console.ReadLine();
-    }
+        private static string _gitRepoRootPath;
 
-    public static string GetProjectStructure(string path, int indent = 0)
-    {
-        if (_gitRepoRootPath == null)
-            _gitRepoRootPath = FindGitRepoRoot(path);
-
-        var sb = new StringBuilder();
-        foreach (var entry in Directory.EnumerateFileSystemEntries(path).OrderBy(e => e))
+        public static string GetUserInput(string prompt)
         {
-            var info = new FileInfo(entry);
-            if (FileChecker.ShouldSkip(info, _gitRepoRootPath)) continue;
-
-            var indentation = new string(' ', indent * 2);
-            sb.AppendLine($"{indentation}{info.Name}{(info.Attributes.HasFlag(FileAttributes.Directory) ? "/" : "")}");
-
-            if (info.Attributes.HasFlag(FileAttributes.Directory))
-                sb.Append(GetProjectStructure(entry, indent + 1));
+            Console.Write(prompt);
+            return Console.ReadLine();
         }
-        return sb.ToString();
-    }
 
-    public static string GetFileContents(string path)
-    {
-        if (_gitRepoRootPath == null)
-            _gitRepoRootPath = FindGitRepoRoot(path);
-
-        var sb = new StringBuilder();
-        foreach (var filePath in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        public static string GetProjectStructure(string path, int indent = 0)
         {
-            var info = new FileInfo(filePath);
-            if (FileChecker.ShouldSkip(info, _gitRepoRootPath)) continue;
+            if (_gitRepoRootPath == null)
+                _gitRepoRootPath = FindGitRepoRoot(path);
 
-            sb.AppendLine(filePath);
-            sb.AppendLine(new string('-', 100));
-            sb.AppendLine(File.ReadAllText(filePath));
-            sb.AppendLine();
+            return string.Join("\n", Directory.EnumerateFileSystemEntries(path)
+                .OrderBy(e => e)
+                .Where(e => !FileChecker.ShouldSkip(new FileInfo(e), _gitRepoRootPath))
+                .Select(e =>
+                {
+                    var info = new FileInfo(e);
+                    var indentation = new string(' ', indent * 2);
+                    var result =
+                        $"{indentation}{info.Name}{(info.Attributes.HasFlag(FileAttributes.Directory) ? "/" : "")}";
+                    return info.Attributes.HasFlag(FileAttributes.Directory)
+                        ? result + "\n" + GetProjectStructure(e, indent + 1)
+                        : result;
+                }));
         }
-        return sb.ToString();
-    }
 
-    private static string FindGitRepoRoot(string path)
-    {
-        while (!string.IsNullOrEmpty(path))
+        public static string GetFileContents(string path)
         {
-            if (Directory.Exists(Path.Combine(path, ".git")))
-                return path;
-            path = Path.GetDirectoryName(path);
+            if (_gitRepoRootPath == null)
+                _gitRepoRootPath = FindGitRepoRoot(path);
+
+            return string.Join("\n\n", Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
+                .Where(f => !FileChecker.ShouldSkip(new FileInfo(f), _gitRepoRootPath))
+                .Select(f => $"{f}\n{new string('-', 100)}\n{File.ReadAllText(f)}"));
         }
-        return null; // Not in a Git repository
+
+        private static string FindGitRepoRoot(string path) =>
+            Directory.Exists(Path.Combine(path, ".git"))
+                ? path
+                : (string.IsNullOrEmpty(path) ? null : FindGitRepoRoot(Path.GetDirectoryName(path)));
     }
 }

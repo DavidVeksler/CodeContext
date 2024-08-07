@@ -1,4 +1,5 @@
-﻿using DotNet.Globbing;
+﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -9,23 +10,40 @@ var defaultOutput = Path.Combine(Path.GetDirectoryName(path), "context.txt");
 var output = args.Length > 1 ? args[1] : MyAppsContext.GetUserInput($"Enter output file (default: {defaultOutput}): ");
 output = string.IsNullOrWhiteSpace(output) ? defaultOutput : output;
 
+var sw = Stopwatch.StartNew();
+
 var structure = MyAppsContext.GetProjectStructure(path);
 var contents = MyAppsContext.GetFileContents(path);
 
-var contentWithLineNumbers = contents.Split('\n')
-    .Select((line, index) => $"{index + 1,4}: {line}")
-    .Aggregate((a, b) => $"{a}\n{b}");
+var contentWithLineNumbers = new StringBuilder();
+using (var reader = new StringReader(contents))
+{
+    string line;
+    for (int i = 1; (line = reader.ReadLine()) != null; i++)
+    {
+        contentWithLineNumbers.AppendFormat("{0,4}: {1}\n", i, line);
+    }
+}
 
 var content = new StringBuilder()
     .AppendLine("Project Structure:")
     .AppendLine(structure)
     .AppendLine("\nFile Contents:")
-    .AppendLine(contentWithLineNumbers)
+    .Append(contentWithLineNumbers)
     .ToString();
 
-var stats = $"Output size: {content.Length} characters, {content.Count(c => c == '\n')} lines";
+var fileCount = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Length;
+var lineCount = content.Count(c => c == '\n');
+var timeTaken = sw.Elapsed;
+
+var stats = $"📊 Stats:\n" +
+            $"📁 Files processed: {fileCount}\n" +
+            $"📝 Total lines: {lineCount}\n" +
+            $"⏱️ Time taken: {timeTaken.TotalSeconds:F2}s\n" +
+            $"💾 Output size: {content.Length} characters";
 
 var outputPath = Directory.Exists(output) ? Path.Combine(output, "context.txt") : output;
 File.WriteAllText(outputPath, content);
-Console.WriteLine($"Output written to {outputPath}");
+
+Console.WriteLine($"✅ Output written to {outputPath}");
 Console.WriteLine(stats);

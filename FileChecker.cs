@@ -230,7 +230,7 @@ private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.
         ".bzrignore", ".coveragerc", ".editorconfig", ".env", ".env.development",
         ".env.production", ".env.local", ".env.test", ".eslintrc", ".gitattributes",
         "thumbs.db", "desktop.ini", ".DS_Store", "npm-debug.log", "yarn-error.log",
-        "package-lock.json", "yarn.lock", "composer.lock"
+        "package-lock.json", "yarn.lock", "composer.lock", ".gitignore"
     };
 
     private static List<string> gitIgnorePatterns;
