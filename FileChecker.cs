@@ -3,227 +3,230 @@ using CodeContext;
 
 public class FileChecker
 {
+    private const long MaxFileSizeBytes = 100 * 1024; // 100KB
+
     private static readonly HashSet<string> IgnoredExtensions = new(StringComparer.OrdinalIgnoreCase)
-{
-    // Executable and library files
-    ".exe", ".dll", ".pdb", ".bin", ".obj", ".lib", ".so", ".dylib", ".a", ".o",
+    {
+        // Executable and library files
+        ".exe", ".dll", ".pdb", ".bin", ".obj", ".lib", ".so", ".dylib", ".a", ".o",
 
-    // Image files
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg", ".webp", ".tiff", ".tif", ".raw", ".psd", ".ai", ".eps", ".ps",
+        // Image files
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg", ".webp", ".tiff", ".tif", ".raw", ".psd", ".ai",
+        ".eps", ".ps",
 
-    // Audio and video files
-    ".mp3", ".mp4", ".wav", ".avi", ".mov", ".flv", ".wmv", ".m4a", ".m4v", ".mkv", ".webm", ".ogg",
+        // Audio and video files
+        ".mp3", ".mp4", ".wav", ".avi", ".mov", ".flv", ".wmv", ".m4a", ".m4v", ".mkv", ".webm", ".ogg",
 
-    // Compressed files
-    ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tgz",
+        // Compressed files
+        ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tgz",
 
-    // Database files
-    ".db", ".sqlite", ".mdf", ".ldf", ".bak", ".mdb", ".accdb",
+        // Database files
+        ".db", ".sqlite", ".mdf", ".ldf", ".bak", ".mdb", ".accdb",
 
-    // Document files
-    ".docx", ".xlsx", ".pptx", ".pdf", ".doc", ".xls", ".ppt", ".rtf", ".odt", ".ods", ".odp",
+        // Document files
+        ".docx", ".xlsx", ".pptx", ".pdf", ".doc", ".xls", ".ppt", ".rtf", ".odt", ".ods", ".odp",
 
-    // Log and temporary files
-    ".log", ".cache", ".tmp", ".temp",
+        // Log and temporary files
+        ".log", ".cache", ".tmp", ".temp",
 
-    // Minified and source map files
-    ".min.js", ".min.css", ".map", ".lock",
+        // Minified and source map files
+        ".min.js", ".min.css", ".map", ".lock",
 
-    // Design files
-    ".sketch", ".fig", ".xd",
+        // Design files
+        ".sketch", ".fig", ".xd",
 
-    // Deployment and settings files
-    ".pub", ".pubxml", ".publishsettings", ".settings", ".suo", ".user", ".userosscache",
+        // Deployment and settings files
+        ".pub", ".pubxml", ".publishsettings", ".settings", ".suo", ".user", ".userosscache",
 
-    // Version control files
-    ".vspscc", ".vssscc", ".pidb", ".scc",
+        // Version control files
+        ".vspscc", ".vssscc", ".pidb", ".scc",
 
-    // System files
-    ".DS_Store", ".localized", ".manifest",
+        // System files
+        ".DS_Store", ".localized", ".manifest",
 
-    // Project-specific files
-    ".csproj.user", ".sln.docstates", ".suo", ".user", ".vssscc",
+        // Project-specific files
+        ".csproj.user", ".sln.docstates", ".suo", ".user", ".vssscc",
 
-    // Compiler and build output
-    ".pdb", ".ilk", ".msi", ".idb", ".pch", ".res",
+        // Compiler and build output
+        ".pdb", ".ilk", ".msi", ".idb", ".pch", ".res",
 
-    // Font files
-    ".eot", ".ttf", ".woff", ".woff2",
+        // Font files
+        ".eot", ".ttf", ".woff", ".woff2",
 
-    // 3D model files
-    ".fbx", ".obj", ".3ds", ".max",
+        // 3D model files
+        ".fbx", ".obj", ".3ds", ".max",
 
-    // Unity-specific files
-    ".unity", ".unitypackage", ".asset",
+        // Unity-specific files
+        ".unity", ".unitypackage", ".asset",
 
-    // Certificate files
-    ".pfx", ".cer", ".crt",
+        // Certificate files
+        ".pfx", ".cer", ".crt",
 
-    // Package manager files
-    ".nupkg", ".snupkg",
+        // Package manager files
+        ".nupkg", ".snupkg",
 
-    // Java-specific files
-    ".class", ".jar",
+        // Java-specific files
+        ".class", ".jar",
 
-    // Python-specific files
-    ".pyc", ".pyo",
+        // Python-specific files
+        ".pyc", ".pyo",
 
-    // Node.js-specific files
-    ".node",
+        // Node.js-specific files
+        ".node",
 
-    // Ruby-specific files
-    ".gem",
+        // Ruby-specific files
+        ".gem",
 
-    // Rust-specific files
-    ".rlib",
+        // Rust-specific files
+        ".rlib",
 
-    // Go-specific files
-    ".a",
+        // Go-specific files
+        ".a",
 
-    // Swift-specific files
-    ".swiftmodule",
+        // Swift-specific files
+        ".swiftmodule",
 
-    // Docker-specific files
-    ".dockerignore",
+        // Docker-specific files
+        ".dockerignore",
 
-    // Kubernetes-specific files
-    ".kubeconfig",
+        // Kubernetes-specific files
+        ".kubeconfig",
 
-    // Machine learning model files
-    ".h5", ".pkl", ".onnx",
+        // Machine learning model files
+        ".h5", ".pkl", ".onnx",
 
-    // Executable scripts (to be cautious)
-    ".bat", ".sh", ".cmd", ".ps1"
-};
+        // Executable scripts (to be cautious)
+        ".bat", ".sh", ".cmd", ".ps1"
+    };
 
-private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.OrdinalIgnoreCase)
-{
-    // Version control systems
-    ".git", ".svn", ".hg", ".bzr", ".cvs",
+    private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Version control systems
+        ".git", ".svn", ".hg", ".bzr", ".cvs",
 
-    // IDE and editor-specific
-    ".vs", ".idea", ".vscode", ".atom", ".sublime-project",
+        // IDE and editor-specific
+        ".vs", ".idea", ".vscode", ".atom", ".sublime-project",
 
-    // Build output
-    "bin", "obj", "Debug", "Release", "x64", "x86", "AnyCPU",
+        // Build output
+        "bin", "obj", "Debug", "Release", "x64", "x86", "AnyCPU",
 
-    // Package management
-    "packages", "node_modules", "bower_components", "jspm_packages",
+        // Package management
+        "packages", "node_modules", "bower_components", "jspm_packages",
 
-    // Python-specific
-    "__pycache__", "venv", "env", "virtualenv", ".venv", ".env", ".pytest_cache",
+        // Python-specific
+        "__pycache__", "venv", "env", "virtualenv", ".venv", ".env", ".pytest_cache",
 
-    // Ruby-specific
-    ".bundle", "vendor/bundle",
+        // Ruby-specific
+        ".bundle", "vendor/bundle",
 
-    // Java-specific
-    "target", ".gradle", "build",
+        // Java-specific
+        "target", ".gradle", "build",
 
-    // JavaScript/TypeScript-specific
-    "dist", "out", "build", ".next", ".nuxt", ".cache",
+        // JavaScript/TypeScript-specific
+        "dist", "out", "build", ".next", ".nuxt", ".cache",
 
-    // Testing and coverage
-    "coverage", "test-results", "reports", ".nyc_output",
+        // Testing and coverage
+        "coverage", "test-results", "reports", ".nyc_output",
 
-    // Logs and temporary files
-    "logs", "temp", "tmp", ".temp", ".tmp",
+        // Logs and temporary files
+        "logs", "temp", "tmp", ".temp", ".tmp",
 
-    // Content and media
-    "uploads", "media", "static", "public", "assets",
+        // Content and media
+        "uploads", "media", "static", "public", "assets",
 
-    // Third-party and dependencies
-    "vendor", "third-party", "external", "lib", "libs",
+        // Third-party and dependencies
+        "vendor", "third-party", "external", "lib", "libs",
 
-    // WordPress-specific
-    "wp-content", "wp-includes", "wp-admin",
+        // WordPress-specific
+        "wp-content", "wp-includes", "wp-admin",
 
-    // Mobile development
-    "Pods", "DerivedData",
+        // Mobile development
+        "Pods", "DerivedData",
 
-    // Containerization
-    ".docker",
+        // Containerization
+        ".docker",
 
-    // CI/CD
-    ".github", ".gitlab", ".circleci", ".jenkins",
+        // CI/CD
+        ".github", ".gitlab", ".circleci", ".jenkins",
 
-    // Documentation
-    "docs", "_site", ".docusaurus",
+        // Documentation
+        "docs", "_site", ".docusaurus",
 
-    // Caching
-    ".cache", ".sass-cache", ".parcel-cache",
+        // Caching
+        ".cache", ".sass-cache", ".parcel-cache",
 
-    // Compiled languages
-    "__pycache__", ".mypy_cache", ".rpt2_cache", ".rts2_cache_cjs", ".rts2_cache_es", ".rts2_cache_umd",
+        // Compiled languages
+        "__pycache__", ".mypy_cache", ".rpt2_cache", ".rts2_cache_cjs", ".rts2_cache_es", ".rts2_cache_umd",
 
-    // OS-specific
-    ".DS_Store", "Thumbs.db",
+        // OS-specific
+        ".DS_Store", "Thumbs.db",
 
-    // Dependency lock files directory
-    ".pnpm-store",
+        // Dependency lock files directory
+        ".pnpm-store",
 
-    // Serverless frameworks
-    ".serverless",
+        // Serverless frameworks
+        ".serverless",
 
-    // Terraform
-    ".terraform",
+        // Terraform
+        ".terraform",
 
-    // Yarn
-    ".yarn",
+        // Yarn
+        ".yarn",
 
-    // Expo (React Native)
-    ".expo",
+        // Expo (React Native)
+        ".expo",
 
-    // Electron
-    "out",
+        // Electron
+        "out",
 
-    // Flutter/Dart
-    ".dart_tool", ".flutter-plugins", ".flutter-plugins-dependencies",
+        // Flutter/Dart
+        ".dart_tool", ".flutter-plugins", ".flutter-plugins-dependencies",
 
-    // Kubernetes
-    ".kube",
+        // Kubernetes
+        ".kube",
 
-    // Ansible
-    ".ansible",
+        // Ansible
+        ".ansible",
 
-    // Chef
-    ".chef",
+        // Chef
+        ".chef",
 
-    // Vagrant
-    ".vagrant",
+        // Vagrant
+        ".vagrant",
 
-    // Unity
-    "Library", "Temp", "Obj", "Builds", "Logs",
+        // Unity
+        "Library", "Temp", "Obj", "Builds", "Logs",
 
-    // Unreal Engine
-    "Binaries", "Build", "Saved", "Intermediate",
+        // Unreal Engine
+        "Binaries", "Build", "Saved", "Intermediate",
 
-    // Godot Engine
-    ".import", "export_presets.cfg",
+        // Godot Engine
+        ".import", "export_presets.cfg",
 
-    // R language
-    ".Rproj.user", ".Rhistory", ".RData",
+        // R language
+        ".Rproj.user", ".Rhistory", ".RData",
 
-    // Jupyter Notebooks
-    ".ipynb_checkpoints",
+        // Jupyter Notebooks
+        ".ipynb_checkpoints",
 
-    // LaTeX
-    "build", "out",
+        // LaTeX
+        "build", "out",
 
-    // Rust
-    "target",
+        // Rust
+        "target",
 
-    // Go
-    "vendor",
+        // Go
+        "vendor",
 
-    // Elixir
-    "_build", ".elixir_ls",
+        // Elixir
+        "_build", ".elixir_ls",
 
-    // Helm Charts
-    "charts",
+        // Helm Charts
+        "charts",
 
-    // Pipenv
-    ".venv"
-};
+        // Pipenv
+        ".venv"
+    };
 
     private static readonly HashSet<string> IgnoredFiles = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -234,19 +237,16 @@ private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.
     };
 
     private static List<string> gitIgnorePatterns;
-    private const long MaxFileSizeBytes = 100 * 1024; // 100KB
 
     public static bool ShouldSkip(FileSystemInfo info, string rootPath)
     {
         // Check if any parent directory is in the ignored list
-        string relativePath = Path.GetRelativePath(rootPath, info.FullName);
-        string[] pathParts = relativePath.Split(Path.DirectorySeparatorChar);
+        var relativePath = Path.GetRelativePath(rootPath, info.FullName);
+        var pathParts = relativePath.Split(Path.DirectorySeparatorChar);
 
-        for (int i = 0; i < pathParts.Length; i++)
+        if (pathParts.Any(IgnoredDirectories.Contains))
         {
-            string currentPart = pathParts[i];
-            if (IgnoredDirectories.Contains(currentPart))
-                return true;
+            return true;
         }
 
         if (info.Attributes.HasFlag(FileAttributes.Directory))
@@ -257,19 +257,19 @@ private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.
             return true;
 
         // Improved extension checking
-        string fileName = info.Name;
-        string extension = Path.GetExtension(fileName);
+        var fileName = info.Name;
+        var extension = Path.GetExtension(fileName);
         if (IgnoredExtensions.Contains(extension))
             return true;
 
         // Check for compound extensions like .min.css
-        int lastDotIndex = fileName.LastIndexOf('.');
+        var lastDotIndex = fileName.LastIndexOf('.');
         if (lastDotIndex > 0)
         {
-            int secondLastDotIndex = fileName.LastIndexOf('.', lastDotIndex - 1);
+            var secondLastDotIndex = fileName.LastIndexOf('.', lastDotIndex - 1);
             if (secondLastDotIndex >= 0)
             {
-                string compoundExtension = fileName.Substring(secondLastDotIndex);
+                var compoundExtension = fileName.Substring(secondLastDotIndex);
                 if (IgnoredExtensions.Contains(compoundExtension))
                     return true;
             }
@@ -287,8 +287,10 @@ private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.
                 return true;
         }
 
-        return FileUtils.IsBinaryFile(info.FullName) || 
-               IgnoredDirectories.Any(dir => info.FullName.Contains($"{Path.DirectorySeparatorChar}{dir}{Path.DirectorySeparatorChar}") || IsGeneratedCode(info.FullName));
+        return FileUtils.IsBinaryFile(info.FullName) ||
+               IgnoredDirectories.Any(dir =>
+                   info.FullName.Contains($"{Path.DirectorySeparatorChar}{dir}{Path.DirectorySeparatorChar}") ||
+                   IsGeneratedCode(info.FullName));
     }
 
 
@@ -307,23 +309,22 @@ private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.
                 return true;
             path = Path.GetDirectoryName(path);
         }
+
         return false;
     }
 
     private static void LoadGitIgnore(string rootPath)
     {
         gitIgnorePatterns = new List<string>();
-        string gitIgnorePath = Path.Combine(rootPath, ".gitignore");
+        var gitIgnorePath = Path.Combine(rootPath, ".gitignore");
         if (File.Exists(gitIgnorePath))
-        {
             gitIgnorePatterns.AddRange(File.ReadAllLines(gitIgnorePath)
                 .Where(line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith('#')));
-        }
     }
 
     private static bool IsIgnoredByGitIgnore(string filePath, string rootPath)
     {
-        string relativePath = Path.GetRelativePath(rootPath, filePath);
+        var relativePath = Path.GetRelativePath(rootPath, filePath);
         return gitIgnorePatterns.Any(pattern => IsMatch(relativePath, pattern));
     }
 

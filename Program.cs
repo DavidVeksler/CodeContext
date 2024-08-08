@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
+﻿using System.Diagnostics;
 using System.Text;
 using CodeContext;
 
@@ -18,11 +15,8 @@ var contents = MyAppsContext.GetFileContents(path);
 var contentWithLineNumbers = new StringBuilder();
 using (var reader = new StringReader(contents))
 {
-    string line;
-    for (int i = 1; (line = reader.ReadLine()) != null; i++)
-    {
+    for (var i = 1; reader.ReadLine() is { } line; i++)
         contentWithLineNumbers.AppendFormat("{0,4}: {1}\n", i, line);
-    }
 }
 
 var content = new StringBuilder()
