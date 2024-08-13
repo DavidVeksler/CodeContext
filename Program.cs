@@ -2,6 +2,9 @@
 using System.Text;
 using CodeContext;
 
+Console.OutputEncoding = Encoding.UTF8;
+
+
 var path = args.Length > 0 ? args[0] : MyAppsContext.GetUserInput("Enter the path to index: ");
 var defaultOutput = Path.Combine(Path.GetDirectoryName(path), "context.txt");
 var output = args.Length > 1 ? args[1] : MyAppsContext.GetUserInput($"Enter output file (default: {defaultOutput}): ");
