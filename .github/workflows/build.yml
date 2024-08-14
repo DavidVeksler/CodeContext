@@ -11,7 +11,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -25,28 +28,25 @@ jobs:
     - name: Test
       run: dotnet test --no-build --verbosity normal
     - name: Publish
-      run: dotnet publish --configuration Release --output ./publish
+      run: dotnet publish --configuration Release --output ./publish --runtime ${{ matrix.os == 'ubuntu-latest' && 'linux-x64' || matrix.os == 'windows-latest' && 'win-x64' || 'osx-x64' }} --self-contained true
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: dist
+        name: dist-${{ matrix.os }}
         path: publish
 
   create_release:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: dist
-        path: dist
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       with:
         tag_name: v${{ github.run_number }}
         release_name: Release ${{ github.run_number }}
@@ -54,14 +54,50 @@ jobs:
           Automated release for commit ${{ github.sha }}
         draft: false
         prerelease: false
-    - name: Zip Release
-      run: zip -r release.zip dist
-    - name: Upload Release Asset
+    - name: Download Linux artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-ubuntu-latest
+        path: dist-linux
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-windows-latest
+        path: dist-windows
+    - name: Download macOS artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-macos-latest
+        path: dist-macos
+    - name: Zip Releases
+      run: |
+        zip -r release-linux.zip dist-linux
+        zip -r release-windows.zip dist-windows
+        zip -r release-macos.zip dist-macos
+    - name: Upload Linux Release Asset
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./release.zip
-        asset_name: release.zip
+        asset_path: ./release-linux.zip
+        asset_name: release-linux.zip
+        asset_content_type: application/zip
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release-windows.zip
+        asset_name: release-windows.zip
+        asset_content_type: application/zip
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release-macos.zip
+        asset_name: release-macos.zip
         asset_content_type: application/zip
