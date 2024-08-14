@@ -6,7 +6,7 @@ It scans project directories, generates a structured representation of the proje
 ![screenshot](https://github.com/DavidVeksler/CodeContext/blob/master/screenshot.png?raw=true)
 
 Update:  a more comprehensive tool is [code2prompt](https://github.com/mufeedvh/code2prompt).  
-I found that CodeContext is more use friendly,  faster, and automatically includes only user code (based on both extension and file contents), but you may have better luck.
+I found that CodeContext is more user friendly,  faster, and automatically includes only user code (based on both extension and file contents), but you may have better luck.
 
 ## Features
 
