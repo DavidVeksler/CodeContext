@@ -13,8 +13,7 @@ try
     var output = GetValidOutputPath(args.ElementAtOrDefault(1) ?? defaultOutput);
 
     var sw = Stopwatch.StartNew();
-    var (structure, contents) = GetProjectInfo(path);
-    var content = BuildContent(structure, contents);
+    var content = BuildContent(path, config);
     var stats = CalculateStats(path, content, sw.Elapsed);
 
     WriteOutput(output, content, config.OutputFormat);
@@ -27,20 +26,10 @@ catch (Exception ex)
     Environment.Exit(1);
 }
 
-static Config LoadConfig()
-{
-    const string configPath = "config.json";
-    try
-    {
-        return File.Exists(configPath)
-            ? JsonSerializer.Deserialize<Config>(File.ReadAllText(configPath)) ?? new Config()
-            : new Config();
-    }
-    catch (JsonException ex)
-    {
-        throw new InvalidOperationException("Error parsing config file", ex);
-    }
-}
+static Config LoadConfig() =>
+    JsonSerializer.Deserialize<Config>(
+        File.Exists("config.json") ? File.ReadAllText("config.json") : "{}"
+    ) ?? new();
 
 static string GetValidPath(string defaultPath)
 {
@@ -57,11 +46,25 @@ static string GetValidOutputPath(string defaultOutput)
     return string.IsNullOrWhiteSpace(output) ? defaultOutput : output;
 }
 
-static (string structure, string contents) GetProjectInfo(string path)
+static string BuildContent(string path, Config config)
 {
     try
     {
-        return (MyAppsContext.GetProjectStructure(path), MyAppsContext.GetFileContents(path));
+        var sb = new StringBuilder();
+
+        if (config.IncludeStructure)
+        {
+            sb.AppendLine("Project Structure:")
+              .AppendLine(MyAppsContext.GetProjectStructure(path));
+        }
+
+        if (config.IncludeContents)
+        {
+            sb.AppendLine("\nFile Contents:")
+              .AppendLine(MyAppsContext.GetFileContents(path));
+        }
+
+        return sb.ToString();
     }
     catch (Exception ex)
     {
@@ -69,44 +72,23 @@ static (string structure, string contents) GetProjectInfo(string path)
     }
 }
 
-static string BuildContent(string structure, string contents) =>
-    new StringBuilder()
-        .AppendLine("Project Structure:")
-        .AppendLine(structure)
-        .AppendLine("\nFile Contents:")
-        .AppendLine(contents)
-        .ToString();
-
-static string CalculateStats(string path, string content, TimeSpan timeTaken)
-{
-    try
-    {
-        var fileCount = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Length;
-        var lineCount = content.Count(c => c == '\n');
-        return $"""
-            📊 Stats:
-            📁 Files processed: {fileCount}
-            📝 Total lines: {lineCount}
-            ⏱️ Time taken: {timeTaken.TotalSeconds:F2}s
-            💾 Output size: {content.Length} characters
-            """;
-    }
-    catch (Exception ex)
-    {
-        throw new InvalidOperationException("Error calculating stats", ex);
-    }
-}
+static string CalculateStats(string path, string content, TimeSpan timeTaken) =>
+    $"""
+    📊 Stats:
+    📁 Files processed: {Directory.GetFiles(path, "*", SearchOption.AllDirectories).Length}
+    📝 Total lines: {content.Count(c => c == '\n')}
+    ⏱️ Time taken: {timeTaken.TotalSeconds:F2}s
+    💾 Output size: {content.Length} characters
+    """;
 
 static void WriteOutput(string output, string content, string format)
 {
     try
     {
         var outputPath = Directory.Exists(output) ? Path.Combine(output, "context.txt") : output;
-        var formattedContent = format.ToLower() switch
-        {
-            "json" => JsonSerializer.Serialize(new { content, timestamp = DateTime.Now }),
-            _ => content
-        };
+        var formattedContent = format.ToLower() == "json"
+            ? JsonSerializer.Serialize(new { content, timestamp = DateTime.Now })
+            : content;
         File.WriteAllText(outputPath, formattedContent);
     }
     catch (Exception ex)
@@ -120,4 +102,6 @@ record Config
     public string DefaultInputPath { get; init; } = ".";
     public string DefaultOutputFileName { get; init; } = "context.txt";
     public string OutputFormat { get; init; } = "text";
+    public bool IncludeStructure { get; init; } = true;
+    public bool IncludeContents { get; init; } = true;
 }
