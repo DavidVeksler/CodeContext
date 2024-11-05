@@ -17,7 +17,7 @@ try
     var stats = CalculateStats(path, content, sw.Elapsed);
 
     WriteOutput(output, content, config.OutputFormat);
-    Console.WriteLine($"✅ Output written to {output}");
+    Console.WriteLine($"\n✅ Output written to {output}");
     Console.WriteLine(stats);
 }
 catch (Exception ex)
@@ -74,6 +74,7 @@ static string BuildContent(string path, Config config)
 
 static string CalculateStats(string path, string content, TimeSpan timeTaken) =>
     $"""
+    
     📊 Stats:
     📁 Files processed: {Directory.GetFiles(path, "*", SearchOption.AllDirectories).Length}
     📝 Total lines: {content.Count(c => c == '\n')}
@@ -83,6 +84,7 @@ static string CalculateStats(string path, string content, TimeSpan timeTaken) =>
 
 static void WriteOutput(string output, string content, string format)
 {
+    Console.WriteLine("\n💾 Writing output...");
     try
     {
         var outputPath = Directory.Exists(output) ? Path.Combine(output, "context.txt") : output;
