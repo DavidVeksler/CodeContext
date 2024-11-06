@@ -1,4 +1,6 @@
-﻿namespace CodeContext;
+﻿using System.Text;
+
+namespace CodeContext;
 public class MyAppsContext
 {
     public static string GitRepoRoot { get; private set; }
@@ -19,19 +21,132 @@ public class MyAppsContext
             .Where(e => !FileChecker.ShouldSkip(new FileInfo(e), GitRepoRoot))
             .ToList();
 
-        return string.Join("\n", entries.Select((e, i) =>
+        var sb = new StringBuilder();
+
+        // Group files by their type/purpose
+        var files = entries.Where(e => !Directory.Exists(e))
+            .Select(f => new FileInfo(f))
+            .ToList();
+
+        var projectFiles = files.Where(f => f.Extension == ".csproj" || f.Extension == ".sln");
+        var configFiles = files.Where(f =>
+            f.Name.StartsWith("appsettings") ||
+            f.Name.EndsWith(".json") ||
+            f.Name.EndsWith(".yml") ||
+            f.Name.EndsWith(".config"));
+        var sourceFiles = files.Where(f =>
+            f.Extension == ".cs" ||
+            f.Extension == ".ts" ||
+            f.Extension == ".js" ||
+            f.Extension == ".py");
+        var otherFiles = files.Except(projectFiles)
+                             .Except(configFiles)
+                             .Except(sourceFiles);
+
+        // Add project overview if it's the root
+        if (indent == 0)
         {
-            if (indent == 0) WriteProgress(i + 1, entries.Count);
+            var projFiles = projectFiles.ToList();
+            if (projFiles.Any())
+            {
+                sb.AppendLine("📦 Project Files:");
+                foreach (var proj in projFiles)
+                {
+                    WriteProgress(files.IndexOf(proj) + 1, files.Count);
+                    sb.AppendLine($"{new string(' ', (indent + 1) * 2)}[{proj.Extension}] {proj.Name}");
+                }
+            }
 
-            var info = new FileInfo(e);
-            var indentation = new string(' ', indent * 2);
-            var result = $"{indentation}{info.Name}{(info.Attributes.HasFlag(FileAttributes.Directory) ? "/" : "")}";
+            var configs = configFiles.ToList();
+            if (configs.Any())
+            {
+                sb.AppendLine("\n⚙️ Configuration Files:");
+                foreach (var config in configs)
+                {
+                    WriteProgress(files.IndexOf(config) + 1, files.Count);
+                    // Extract environment for appsettings files
+                    var env = config.Name.Contains("appsettings.")
+                        ? $"({config.Name.Split('.')[1]}) "
+                        : "";
+                    sb.AppendLine($"{new string(' ', (indent + 1) * 2)}[{config.Extension}] {config.Name} {env}");
+                }
+            }
+        }
 
-            return info.Attributes.HasFlag(FileAttributes.Directory)
-                ? result + "\n" + GetProjectStructure(e, indent + 1)
-                : result;
-        }));
+        // Add source files
+        var srcFiles = sourceFiles.ToList();
+        if (srcFiles.Any())
+        {
+            if (indent == 0) sb.AppendLine("\n💻 Source Files:");
+            foreach (var src in srcFiles)
+            {
+                WriteProgress(files.IndexOf(src) + 1, files.Count);
+                var filePurpose = GetFilePurpose(src.Name);
+                sb.AppendLine($"{new string(' ', (indent + 1) * 2)}[{src.Extension}] {src.Name} {filePurpose}");
+            }
+        }
+
+        // Add remaining files
+        var remaining = otherFiles.ToList();
+        if (remaining.Any())
+        {
+            if (indent == 0) sb.AppendLine("\n📄 Other Files:");
+            foreach (var file in remaining)
+            {
+                WriteProgress(files.IndexOf(file) + 1, files.Count);
+                sb.AppendLine($"{new string(' ', (indent + 1) * 2)}{file.Name}");
+            }
+        }
+
+        // Process subdirectories
+        var directories = entries.Where(e => Directory.Exists(e))
+            .Select(d => new DirectoryInfo(d))
+            .ToList();
+
+        if (directories.Any())
+        {
+            if (indent == 0) sb.AppendLine("\n📂 Directories:");
+            foreach (var dir in directories)
+            {
+                var dirPurpose = GetDirectoryPurpose(dir.Name);
+                sb.AppendLine($"{new string(' ', (indent + 1) * 2)}[{dir.Name}/] {dirPurpose}")
+                  .Append(GetProjectStructure(dir.FullName, indent + 1));
+            }
+        }
+
+        return sb.ToString();
     }
+
+    private static string GetFilePurpose(string fileName) => fileName.ToLower() switch
+    {
+        var n when n.EndsWith("controller.cs") => "(API Endpoint)",
+        var n when n.EndsWith("service.cs") => "(Business Logic)",
+        var n when n.EndsWith("repository.cs") => "(Data Access)",
+        var n when n.EndsWith("model.cs") => "(Data Model)",
+        var n when n.EndsWith("request.cs") => "(API Request)",
+        var n when n.EndsWith("response.cs") => "(API Response)",
+        var n when n.EndsWith("dto.cs") => "(Data Transfer)",
+        var n when n.EndsWith("mapper.cs") => "(Object Mapping)",
+        var n when n == "program.cs" => "(Application Entry)",
+        var n when n == "startup.cs" => "(App Configuration)",
+        _ => ""
+    };
+
+    private static string GetDirectoryPurpose(string dirName) => dirName.ToLower() switch
+    {
+        "controllers" => "(API Endpoints)",
+        "services" => "(Business Logic)",
+        "models" => "(Data Models)",
+        "views" => "(UI Templates)",
+        "repositories" => "(Data Access)",
+        "tests" => "(Test Cases)",
+        "migrations" => "(DB Migrations)",
+        "scripts" => "(Utility Scripts)",
+        "docs" => "(Documentation)",
+        "config" => "(Configuration)",
+        "wwwroot" => "(Static Files)",
+        _ => ""
+    };
 
     public static string GetFileContents(string path)
     {
