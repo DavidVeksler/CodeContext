@@ -96,7 +96,10 @@ public class FileChecker
         ".h5", ".pkl", ".onnx",
 
         // Executable scripts (to be cautious)
-        ".bat", ".sh", ".cmd", ".ps1"
+        ".bat", ".sh", ".cmd", ".ps1",
+
+        //
+        ".sql"
     };
 
     private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.OrdinalIgnoreCase)
