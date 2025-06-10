@@ -104,6 +104,8 @@ public class FileChecker
 
     private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
+        ".sonarqube",
+
         // Version control systems
         ".git", ".svn", ".hg", ".bzr", ".cvs",
 
