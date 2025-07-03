@@ -18,7 +18,7 @@ public class MyAppsContext
 
         var entries = Directory.EnumerateFileSystemEntries(path)
             .OrderBy(e => e)
-            .Where(e => !FileChecker.ShouldSkip(new FileInfo(e), GitRepoRoot))
+            .Where(e => GitRepoRoot == null || !FileChecker.ShouldSkip(new FileInfo(e), GitRepoRoot))
             .ToList();
 
         var sb = new StringBuilder();
@@ -61,10 +61,15 @@ public class MyAppsContext
         }));
     }
 
-    private static string FindGitRepoRoot(string path) =>
-        Directory.Exists(Path.Combine(path, ".git"))
+    private static string FindGitRepoRoot(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
+            return null;
+
+        return Directory.Exists(Path.Combine(path, ".git"))
             ? path
             : string.IsNullOrEmpty(path) ? null : FindGitRepoRoot(Path.GetDirectoryName(path));
+    }
 
     private static void WriteProgress(int current, int total)
     {
