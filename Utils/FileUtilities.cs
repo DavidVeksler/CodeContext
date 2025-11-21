@@ -14,10 +14,7 @@ public static class FileUtilities
     /// <returns>True if the file appears to be binary; otherwise, false.</returns>
     public static bool IsBinaryFile(string filePath, int chunkSize = 4096, double binaryThreshold = 0.3)
     {
-        if (string.IsNullOrEmpty(filePath))
-        {
-            throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
-        }
+        Guard.NotNullOrEmpty(filePath, nameof(filePath));
 
         if (!File.Exists(filePath))
         {
@@ -33,7 +30,6 @@ public static class FileUtilities
                 return false;
             }
 
-            // Check for UTF-8 BOM
             if (HasUtf8Bom(stream))
             {
                 return false;
@@ -41,9 +37,8 @@ public static class FileUtilities
 
             return CheckBinaryContent(stream, chunkSize, binaryThreshold);
         }
-        catch (Exception)
+        catch
         {
-            // If we can't read the file (permissions, etc.), assume it's not binary
             return false;
         }
     }

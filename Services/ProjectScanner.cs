@@ -1,5 +1,6 @@
 using System.Text;
 using CodeContext.Interfaces;
+using CodeContext.Utils;
 
 namespace CodeContext.Services;
 
@@ -12,15 +13,10 @@ public class ProjectScanner
     private readonly IConsoleWriter _console;
     private string? _gitRepoRoot;
 
-    /// <summary>
-    /// Initializes a new instance of the ProjectScanner class.
-    /// </summary>
-    /// <param name="fileChecker">The file checker to use for filtering.</param>
-    /// <param name="console">The console writer for output.</param>
     public ProjectScanner(IFileChecker fileChecker, IConsoleWriter console)
     {
-        _fileChecker = fileChecker ?? throw new ArgumentNullException(nameof(fileChecker));
-        _console = console ?? throw new ArgumentNullException(nameof(console));
+        _fileChecker = Guard.NotNull(fileChecker, nameof(fileChecker));
+        _console = Guard.NotNull(console, nameof(console));
     }
 
     /// <summary>
@@ -37,35 +33,26 @@ public class ProjectScanner
     /// <summary>
     /// Generates a hierarchical structure representation of the project directory.
     /// </summary>
-    /// <param name="path">The directory path to scan.</param>
+    /// <param name="projectPath">The directory path to scan.</param>
     /// <param name="indent">Current indentation level (used for recursion).</param>
     /// <returns>A string representation of the directory structure.</returns>
-    public string GetProjectStructure(string path, int indent = 0)
+    public string GetProjectStructure(string projectPath, int indent = 0)
     {
-        if (string.IsNullOrEmpty(path))
-        {
-            throw new ArgumentException("Path cannot be null or empty.", nameof(path));
-        }
-
-        if (!Directory.Exists(path))
-        {
-            throw new DirectoryNotFoundException($"Directory not found: {path}");
-        }
-
-        _gitRepoRoot ??= FindGitRepoRoot(path);
+        Guard.DirectoryExists(projectPath, nameof(projectPath));
+        _gitRepoRoot ??= GitHelper.FindRepositoryRoot(projectPath);
 
         if (indent == 0)
         {
             _console.WriteLine("📁 Analyzing directory structure...");
         }
 
-        var rootPath = _gitRepoRoot ?? path;
-        var entries = Directory.EnumerateFileSystemEntries(path)
+        var rootPath = _gitRepoRoot ?? projectPath;
+        var entries = Directory.EnumerateFileSystemEntries(projectPath)
             .OrderBy(e => e)
             .Where(e => !_fileChecker.ShouldSkip(new FileInfo(e), rootPath))
             .ToList();
 
-        var sb = new StringBuilder();
+        var structure = new StringBuilder();
 
         for (int i = 0; i < entries.Count; i++)
         {
@@ -75,45 +62,36 @@ public class ProjectScanner
             if (Directory.Exists(entry))
             {
                 var dir = new DirectoryInfo(entry);
-                sb.AppendLine($"{new string(' ', indent * 2)}[{dir.Name}/]");
-                sb.Append(GetProjectStructure(entry, indent + 1));
+                structure.AppendLine($"{new string(' ', indent * 2)}[{dir.Name}/]");
+                structure.Append(GetProjectStructure(entry, indent + 1));
             }
             else
             {
                 var file = new FileInfo(entry);
-                sb.AppendLine($"{new string(' ', indent * 2)}[{file.Extension}] {file.Name}");
+                structure.AppendLine($"{new string(' ', indent * 2)}[{file.Extension}] {file.Name}");
             }
         }
 
-        return sb.ToString();
+        return structure.ToString();
     }
 
     /// <summary>
     /// Retrieves the contents of all non-filtered files in the directory tree.
     /// </summary>
-    /// <param name="path">The directory path to scan.</param>
+    /// <param name="projectPath">The directory path to scan.</param>
     /// <returns>A string containing all file contents with separators.</returns>
-    public string GetFileContents(string path)
+    public string GetFileContents(string projectPath)
     {
-        if (string.IsNullOrEmpty(path))
-        {
-            throw new ArgumentException("Path cannot be null or empty.", nameof(path));
-        }
-
-        if (!Directory.Exists(path))
-        {
-            throw new DirectoryNotFoundException($"Directory not found: {path}");
-        }
-
-        _gitRepoRoot ??= FindGitRepoRoot(path);
+        Guard.DirectoryExists(projectPath, nameof(projectPath));
+        _gitRepoRoot ??= GitHelper.FindRepositoryRoot(projectPath);
         _console.WriteLine("\n📄 Processing files...");
 
-        var rootPath = _gitRepoRoot ?? path;
-        var files = Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
+        var rootPath = _gitRepoRoot ?? projectPath;
+        var files = Directory.EnumerateFiles(projectPath, "*", SearchOption.AllDirectories)
             .Where(f => !_fileChecker.ShouldSkip(new FileInfo(f), rootPath))
             .ToList();
 
-        var results = new List<string>();
+        var fileContents = new List<string>();
         for (int i = 0; i < files.Count; i++)
         {
             WriteProgress(i + 1, files.Count);
@@ -122,7 +100,7 @@ public class ProjectScanner
             try
             {
                 var content = File.ReadAllText(file);
-                results.Add($"{file}\n{new string('-', 100)}\n{content}");
+                fileContents.Add($"{file}\n{new string('-', 100)}\n{content}");
             }
             catch (Exception ex)
             {
@@ -130,33 +108,13 @@ public class ProjectScanner
             }
         }
 
-        return string.Join("\n\n", results);
+        return string.Join("\n\n", fileContents);
     }
 
     /// <summary>
-    /// Gets the root path of the git repository containing the specified path.
+    /// Gets the root path of the git repository containing the scanned path.
     /// </summary>
     public string? GitRepoRoot => _gitRepoRoot;
-
-    private string? FindGitRepoRoot(string path)
-    {
-        if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
-        {
-            return null;
-        }
-
-        var currentPath = path;
-        while (!string.IsNullOrEmpty(currentPath))
-        {
-            if (Directory.Exists(Path.Combine(currentPath, ".git")))
-            {
-                return currentPath;
-            }
-            currentPath = Path.GetDirectoryName(currentPath);
-        }
-
-        return null;
-    }
 
     private void WriteProgress(int current, int total)
     {
