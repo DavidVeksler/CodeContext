@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using CodeContext;
@@ -10,82 +10,143 @@ try
     var config = LoadConfig();
     var path = GetValidPath(args.FirstOrDefault() ?? config.DefaultInputPath);
 
-    // 1. Get input folder name
-    var inputFolderName = new DirectoryInfo(path).Name;
-    if (string.IsNullOrEmpty(inputFolderName) || inputFolderName == ".") // Handle cases like "." or "C:\"
-    {
-        // For "." use current directory name, for root drives, use a generic name or drive letter
-        inputFolderName = new DirectoryInfo(Environment.CurrentDirectory).Name;
-        if (path.EndsWith(Path.DirectorySeparatorChar.ToString()) || path.EndsWith(Path.AltDirectorySeparatorChar.ToString()))
-        {
-            // If path was like "C:/", DirectoryInfo(path).Name might be "C:".
-            // Let's try to get a more descriptive name if it's a root drive.
-            var root = Path.GetPathRoot(Path.GetFullPath(path));
-            if (!string.IsNullOrEmpty(root))
-            {
-                inputFolderName = root.Replace(Path.DirectorySeparatorChar.ToString(), "").Replace(Path.AltDirectorySeparatorChar.ToString(), "").Replace(":", "");
-                if (string.IsNullOrEmpty(inputFolderName)) inputFolderName = "root";
-            }
-        }
-    }
-
-
-    // 2. Construct prefixed default file name
+    var inputFolderName = GetInputFolderName(path);
     var prefixedDefaultFileName = $"{inputFolderName}_{config.DefaultOutputFileName}";
-
-    // 3. Default output is INSIDE the input path folder with the prefixed name
     var defaultFullOutputPath = Path.Combine(path, prefixedDefaultFileName);
-
-    // 4. Get final output path (could be a file or directory specified by user, or the default)
     var outputTarget = GetValidOutputPath(args.ElementAtOrDefault(1), defaultFullOutputPath);
 
     var sw = Stopwatch.StartNew();
     var content = BuildContent(path, config);
     var stats = CalculateStats(path, content, sw.Elapsed);
 
-    // 5. Pass prefixedDefaultFileName to WriteOutput
     string actualOutputPath = WriteOutput(outputTarget, content, config.OutputFormat, prefixedDefaultFileName);
-    Console.WriteLine($"\n✅ Output written to {actualOutputPath}"); // 6. Use actual output path
+    Console.WriteLine($"\n✅ Output written to {actualOutputPath}");
     Console.WriteLine(stats);
+}
+catch (DirectoryNotFoundException ex)
+{
+    Console.WriteLine($"❌ Directory Error: {ex.Message}");
+    Environment.Exit(1);
+}
+catch (IOException ex)
+{
+    Console.WriteLine($"❌ I/O Error: {ex.Message}");
+    Environment.Exit(2);
+}
+catch (UnauthorizedAccessException ex)
+{
+    Console.WriteLine($"❌ Access Denied: {ex.Message}");
+    Environment.Exit(3);
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"❌ Error: {ex.Message}");
-    Environment.Exit(1);
+    Console.WriteLine($"❌ Unexpected Error: {ex.Message}");
+    if (ex.InnerException != null)
+    {
+        Console.WriteLine($"   Details: {ex.InnerException.Message}");
+    }
+    Environment.Exit(4);
 }
 
-static Config LoadConfig() =>
-    JsonSerializer.Deserialize<Config>(
-        File.Exists("config.json") ? File.ReadAllText("config.json") : "{}"
-    ) ?? new();
+/// <summary>
+/// Loads configuration from config.json file if it exists, otherwise returns default configuration.
+/// </summary>
+/// <returns>The loaded or default configuration.</returns>
+static Config LoadConfig()
+{
+    try
+    {
+        var configJson = File.Exists("config.json") ? File.ReadAllText("config.json") : "{}";
+        return JsonSerializer.Deserialize<Config>(configJson) ?? new Config();
+    }
+    catch (JsonException ex)
+    {
+        Console.WriteLine($"⚠️ Warning: Invalid config.json format ({ex.Message}). Using defaults.");
+        return new Config();
+    }
+}
 
+/// <summary>
+/// Gets and validates the directory path to be indexed.
+/// </summary>
+/// <param name="defaultPath">The default path to use if user doesn't provide one.</param>
+/// <returns>The validated full path.</returns>
+/// <exception cref="DirectoryNotFoundException">Thrown when the specified directory doesn't exist.</exception>
 static string GetValidPath(string defaultPath)
 {
     var path = MyAppsContext.GetUserInput($"Enter the path to index (default: {defaultPath}): ");
     var finalPath = string.IsNullOrWhiteSpace(path) ? defaultPath : path;
-    var fullPath = Path.GetFullPath(finalPath); // Resolve to full path for consistency
+    var fullPath = Path.GetFullPath(finalPath);
 
-    return Directory.Exists(fullPath)
-        ? fullPath
-        : throw new DirectoryNotFoundException($"Invalid directory path: {fullPath}");
+    if (!Directory.Exists(fullPath))
+    {
+        throw new DirectoryNotFoundException($"Directory not found: {fullPath}");
+    }
+
+    return fullPath;
 }
 
-// Modified to accept user's argument and the fully resolved default path
+/// <summary>
+/// Gets and validates the output path for the generated context file.
+/// </summary>
+/// <param name="outputArgFromUser">Optional output path from command-line arguments.</param>
+/// <param name="defaultFullOutputPathIfNoArgAndNoInput">Default output path if none provided.</param>
+/// <returns>The validated full output path.</returns>
 static string GetValidOutputPath(string? outputArgFromUser, string defaultFullOutputPathIfNoArgAndNoInput)
 {
-    // If an argument is provided, use it directly.
     if (!string.IsNullOrWhiteSpace(outputArgFromUser))
     {
-        return Path.GetFullPath(outputArgFromUser); // Resolve to full path
+        return Path.GetFullPath(outputArgFromUser);
     }
-    // Otherwise, prompt the user, showing the calculated default.
+
     var userInput = MyAppsContext.GetUserInput($"Enter output file/directory (default: {defaultFullOutputPathIfNoArgAndNoInput}): ");
     return string.IsNullOrWhiteSpace(userInput)
         ? defaultFullOutputPathIfNoArgAndNoInput
-        : Path.GetFullPath(userInput); // Resolve to full path
+        : Path.GetFullPath(userInput);
 }
 
+/// <summary>
+/// Extracts a clean folder name from the input path for output file naming.
+/// </summary>
+/// <param name="path">The input path.</param>
+/// <returns>A sanitized folder name.</returns>
+static string GetInputFolderName(string path)
+{
+    var inputFolderName = new DirectoryInfo(path).Name;
 
+    if (string.IsNullOrEmpty(inputFolderName) || inputFolderName == ".")
+    {
+        inputFolderName = new DirectoryInfo(Environment.CurrentDirectory).Name;
+
+        if (path.EndsWith(Path.DirectorySeparatorChar.ToString()) ||
+            path.EndsWith(Path.AltDirectorySeparatorChar.ToString()))
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(path));
+            if (!string.IsNullOrEmpty(root))
+            {
+                inputFolderName = root
+                    .Replace(Path.DirectorySeparatorChar.ToString(), "")
+                    .Replace(Path.AltDirectorySeparatorChar.ToString(), "")
+                    .Replace(":", "");
+
+                if (string.IsNullOrEmpty(inputFolderName))
+                {
+                    inputFolderName = "root";
+                }
+            }
+        }
+    }
+
+    return inputFolderName;
+}
+
+/// <summary>
+/// Builds the complete content output including structure and file contents based on configuration.
+/// </summary>
+/// <param name="path">The directory path to process.</param>
+/// <param name="config">The configuration specifying what to include.</param>
+/// <returns>The complete output content.</returns>
+/// <exception cref="InvalidOperationException">Thrown when an error occurs during processing.</exception>
 static string BuildContent(string path, Config config)
 {
     try
@@ -112,25 +173,51 @@ static string BuildContent(string path, Config config)
     }
 }
 
-static string CalculateStats(string path, string content, TimeSpan timeTaken) =>
-    $"""
+/// <summary>
+/// Calculates and formats statistics about the processing operation.
+/// </summary>
+/// <param name="path">The directory that was processed.</param>
+/// <param name="content">The generated content.</param>
+/// <param name="timeTaken">Time elapsed during processing.</param>
+/// <returns>Formatted statistics string.</returns>
+static string CalculateStats(string path, string content, TimeSpan timeTaken)
+{
+    try
+    {
+        var fileCount = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Length;
+        var lineCount = content.Count(c => c == '\n');
 
-    📊 Stats:
-    📁 Files processed: {Directory.GetFiles(path, "*", SearchOption.AllDirectories).Length}
-    📝 Total lines: {content.Count(c => c == '\n')}
-    ⏱️ Time taken: {timeTaken.TotalSeconds:F2}s
-    💾 Output size: {content.Length} characters
-    """;
+        return $"""
 
-// Modified to accept the effective output filename and return the actual path written
+        📊 Stats:
+        📁 Files processed: {fileCount}
+        📝 Total lines: {lineCount}
+        ⏱️ Time taken: {timeTaken.TotalSeconds:F2}s
+        💾 Output size: {content.Length} characters
+        """;
+    }
+    catch (Exception)
+    {
+        return "\n📊 Stats: Unable to calculate statistics";
+    }
+}
+
+/// <summary>
+/// Writes the generated content to the specified output location.
+/// </summary>
+/// <param name="outputTarget">Target path (file or directory).</param>
+/// <param name="content">Content to write.</param>
+/// <param name="format">Output format (text or json).</param>
+/// <param name="effectiveOutputFileName">Filename to use if outputTarget is a directory.</param>
+/// <returns>The actual path where the file was written.</returns>
+/// <exception cref="IOException">Thrown when an error occurs during file writing.</exception>
 static string WriteOutput(string outputTarget, string content, string format, string effectiveOutputFileName)
 {
     Console.WriteLine("\n💾 Writing output...");
-    string resolvedFilePath = "";
+    string resolvedFilePath;
+
     try
     {
-        // If outputTarget is an existing directory, combine it with the effectiveOutputFileName.
-        // Otherwise, assume outputTarget is the full file path.
         if (Directory.Exists(outputTarget))
         {
             resolvedFilePath = Path.Combine(outputTarget, effectiveOutputFileName);
@@ -138,8 +225,8 @@ static string WriteOutput(string outputTarget, string content, string format, st
         else
         {
             resolvedFilePath = outputTarget;
-            // Ensure the directory for the output file exists
             var outputDirectory = Path.GetDirectoryName(resolvedFilePath);
+
             if (!string.IsNullOrEmpty(outputDirectory) && !Directory.Exists(outputDirectory))
             {
                 Directory.CreateDirectory(outputDirectory);
@@ -147,23 +234,34 @@ static string WriteOutput(string outputTarget, string content, string format, st
         }
 
         var formattedContent = format.ToLower() == "json"
-            ? JsonSerializer.Serialize(new { content, timestamp = DateTime.Now })
+            ? JsonSerializer.Serialize(new { content, timestamp = DateTime.Now }, new JsonSerializerOptions { WriteIndented = true })
             : content;
+
         File.WriteAllText(resolvedFilePath, formattedContent);
-        return resolvedFilePath; // Return the actual path
+        return resolvedFilePath;
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        throw new IOException($"Access denied writing to {outputTarget}", ex);
     }
     catch (Exception ex)
     {
-        // Try to provide a more specific path in the error if resolvedFilePath was determined
-        string errorPath = string.IsNullOrEmpty(resolvedFilePath) ? outputTarget : resolvedFilePath;
-        throw new IOException($"Error writing output to {errorPath}", ex);
+        throw new IOException($"Failed to write output to {outputTarget}", ex);
     }
 }
 
+/// <summary>
+/// Application configuration record.
+/// </summary>
+/// <param name="DefaultInputPath">Default directory path to scan.</param>
+/// <param name="DefaultOutputFileName">Default output file name.</param>
+/// <param name="OutputFormat">Output format (text or json).</param>
+/// <param name="IncludeStructure">Whether to include directory structure in output.</param>
+/// <param name="IncludeContents">Whether to include file contents in output.</param>
 record Config
 {
     public string DefaultInputPath { get; init; } = ".";
-    public string DefaultOutputFileName { get; init; } = "context.txt"; // Base name
+    public string DefaultOutputFileName { get; init; } = "context.txt";
     public string OutputFormat { get; init; } = "text";
     public bool IncludeStructure { get; init; } = true;
     public bool IncludeContents { get; init; } = true;

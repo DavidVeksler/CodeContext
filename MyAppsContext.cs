@@ -1,79 +1,56 @@
-﻿using System.Text;
+﻿using CodeContext.Configuration;
+using CodeContext.Services;
 
 namespace CodeContext;
+
+/// <summary>
+/// Legacy compatibility wrapper for ProjectScanner.
+/// Use ProjectScanner directly for new code.
+/// </summary>
+[Obsolete("Use ProjectScanner instead for better testability and maintainability.")]
 public class MyAppsContext
 {
-    public static string GitRepoRoot { get; private set; }
+    private static readonly Lazy<ProjectScanner> _instance = new(() =>
+    {
+        var config = new FilterConfiguration();
+        var fileChecker = new FileFilterService(config);
+        var console = new ConsoleWriter();
+        return new ProjectScanner(fileChecker, console);
+    });
 
+    /// <summary>
+    /// Gets the git repository root path.
+    /// </summary>
+    public static string? GitRepoRoot => _instance.Value.GitRepoRoot;
+
+    /// <summary>
+    /// Gets user input with a prompt.
+    /// </summary>
+    /// <param name="prompt">The prompt to display.</param>
+    /// <returns>The user's input.</returns>
     public static string GetUserInput(string prompt)
     {
-        Console.Write(prompt);
-        return Console.ReadLine();
+        return _instance.Value.GetUserInput(prompt);
     }
 
+    /// <summary>
+    /// Generates a hierarchical structure representation of the project directory.
+    /// </summary>
+    /// <param name="path">The directory path to scan.</param>
+    /// <param name="indent">Current indentation level (used for recursion).</param>
+    /// <returns>A string representation of the directory structure.</returns>
     public static string GetProjectStructure(string path, int indent = 0)
     {
-        if (GitRepoRoot == null) GitRepoRoot = FindGitRepoRoot(path);
-        if (indent == 0) Console.WriteLine("📁 Analyzing directory structure...");
-
-        var entries = Directory.EnumerateFileSystemEntries(path)
-            .OrderBy(e => e)
-            .Where(e => GitRepoRoot == null || !FileChecker.ShouldSkip(new FileInfo(e), GitRepoRoot))
-            .ToList();
-
-        var sb = new StringBuilder();
-        
-        // Process all entries
-        for (int i = 0; i < entries.Count; i++)
-        {
-            WriteProgress(i + 1, entries.Count);
-            var entry = entries[i];
-            
-            if (Directory.Exists(entry))
-            {
-                var dir = new DirectoryInfo(entry);
-                sb.AppendLine($"{new string(' ', indent * 2)}[{dir.Name}/]")
-                  .Append(GetProjectStructure(entry, indent + 1));
-            }
-            else
-            {
-                var file = new FileInfo(entry);
-                sb.AppendLine($"{new string(' ', indent * 2)}[{file.Extension}] {file.Name}");
-            }
-        }
-
-        return sb.ToString();
+        return _instance.Value.GetProjectStructure(path, indent);
     }
 
+    /// <summary>
+    /// Retrieves the contents of all non-filtered files in the directory tree.
+    /// </summary>
+    /// <param name="path">The directory path to scan.</param>
+    /// <returns>A string containing all file contents with separators.</returns>
     public static string GetFileContents(string path)
     {
-        if (GitRepoRoot == null) GitRepoRoot = FindGitRepoRoot(path);
-        Console.WriteLine("\n📄 Processing files...");
-
-        var files = Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
-            .Where(f => !FileChecker.ShouldSkip(new FileInfo(f), GitRepoRoot))
-            .ToList();
-
-        return string.Join("\n\n", files.Select((f, i) =>
-        {
-            WriteProgress(i + 1, files.Count);
-            return $"{f}\n{new string('-', 100)}\n{File.ReadAllText(f)}";
-        }));
-    }
-
-    private static string FindGitRepoRoot(string path)
-    {
-        if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
-            return null;
-
-        return Directory.Exists(Path.Combine(path, ".git"))
-            ? path
-            : string.IsNullOrEmpty(path) ? null : FindGitRepoRoot(Path.GetDirectoryName(path));
-    }
-
-    private static void WriteProgress(int current, int total)
-    {
-        var percent = (int)((current / (double)total) * 100);
-        Console.Write($"\r⏳ Progress: {percent}% ({current}/{total})");
+        return _instance.Value.GetFileContents(path);
     }
 }
