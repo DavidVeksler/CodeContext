@@ -6,7 +6,9 @@
       "Bash(chmod:*)",
       "Bash(./run_ats_tests.sh:*)",
       "Bash(cp:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(dotnet build:*)",
+      "Bash(\"C:\\Users\\veksl\\Projects\\CodeContext\\bin\\Release\\net9.0\\CodeContext.exe\" \"C:\\Users\\veksl\\Projects\\ResumeForge\")"
     ],
     "deny": []
   }
