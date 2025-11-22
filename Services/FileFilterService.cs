@@ -24,6 +24,12 @@ public class FileFilterService : IFileChecker
         Guard.NotNull(info, nameof(info));
         Guard.NotNullOrEmpty(rootPath, nameof(rootPath));
 
+        // Skip symbolic links and junction points to avoid I/O errors
+        if (info.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            return true;
+        }
+
         // Check if any parent directory is in the ignored list
         var relativePath = Path.GetRelativePath(rootPath, info.FullName);
         var pathParts = relativePath.Split(Path.DirectorySeparatorChar);

@@ -47,10 +47,37 @@ public class ProjectScanner
         }
 
         var rootPath = _gitRepoRoot ?? projectPath;
-        var entries = Directory.EnumerateFileSystemEntries(projectPath)
-            .OrderBy(e => e)
-            .Where(e => !_fileChecker.ShouldSkip(new FileInfo(e), rootPath))
-            .ToList();
+
+        List<string> entries;
+        try
+        {
+            var enumerationOptions = new EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = false
+            };
+
+            entries = Directory.EnumerateFileSystemEntries(projectPath, "*", enumerationOptions)
+                .OrderBy(e => e)
+                .Where(e =>
+                {
+                    try
+                    {
+                        return !_fileChecker.ShouldSkip(new FileInfo(e), rootPath);
+                    }
+                    catch
+                    {
+                        // Skip entries that can't be accessed
+                        return false;
+                    }
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _console.WriteLine($"\n⚠️ Warning: Could not enumerate directory {projectPath}: {ex.Message}");
+            return string.Empty;
+        }
 
         var structure = new StringBuilder();
 
@@ -87,9 +114,10 @@ public class ProjectScanner
         _console.WriteLine("\n📄 Processing files...");
 
         var rootPath = _gitRepoRoot ?? projectPath;
-        var files = Directory.EnumerateFiles(projectPath, "*", SearchOption.AllDirectories)
-            .Where(f => !_fileChecker.ShouldSkip(new FileInfo(f), rootPath))
-            .ToList();
+        var files = new List<string>();
+
+        // Manually enumerate files recursively to respect filters
+        EnumerateFilesRecursively(projectPath, rootPath, files);
 
         var fileContents = new List<string>();
         for (int i = 0; i < files.Count; i++)
@@ -109,6 +137,59 @@ public class ProjectScanner
         }
 
         return string.Join("\n\n", fileContents);
+    }
+
+    /// <summary>
+    /// Recursively enumerates files while respecting filter rules.
+    /// </summary>
+    private void EnumerateFilesRecursively(string directory, string rootPath, List<string> files)
+    {
+        try
+        {
+            var enumerationOptions = new EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = false
+            };
+
+            // Get files in current directory
+            foreach (var file in Directory.EnumerateFiles(directory, "*", enumerationOptions))
+            {
+                try
+                {
+                    var fileInfo = new FileInfo(file);
+                    if (!_fileChecker.ShouldSkip(fileInfo, rootPath))
+                    {
+                        files.Add(file);
+                    }
+                }
+                catch
+                {
+                    // Skip files that can't be accessed
+                }
+            }
+
+            // Recursively process subdirectories
+            foreach (var subDir in Directory.EnumerateDirectories(directory, "*", enumerationOptions))
+            {
+                try
+                {
+                    var dirInfo = new DirectoryInfo(subDir);
+                    if (!_fileChecker.ShouldSkip(dirInfo, rootPath))
+                    {
+                        EnumerateFilesRecursively(subDir, rootPath, files);
+                    }
+                }
+                catch
+                {
+                    // Skip directories that can't be accessed
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _console.WriteLine($"\n⚠️ Warning: Could not enumerate directory {directory}: {ex.Message}");
+        }
     }
 
     /// <summary>

@@ -116,6 +116,8 @@ public class FilterConfiguration
     {
         ".sonarqube",
 
+        "venv",
+
         // Version control systems
         ".git", ".svn", ".hg", ".bzr", ".cvs",
 
