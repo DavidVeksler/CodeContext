@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "*",
+      "Bash(python:*)",
+      "Bash(chmod:*)",
+      "Bash(./run_ats_tests.sh:*)",
+      "Bash(cp:*)",
+      "Bash(ls:*)"
+    ],
+    "deny": []
+  }
+}
