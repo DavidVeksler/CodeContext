@@ -4,7 +4,7 @@ using CodeContext.Interfaces;
 namespace CodeContext.Services;
 
 /// <summary>
-/// Formats and writes output to files in various formats.
+/// Functional output formatter with separated I/O and formatting logic.
 /// </summary>
 public class OutputFormatter
 {
@@ -16,7 +16,8 @@ public class OutputFormatter
     }
 
     /// <summary>
-    /// Writes content to the specified output location.
+    /// Writes content to the specified output location (I/O operation).
+    /// Composed from pure formatting and impure I/O functions.
     /// </summary>
     /// <param name="outputTarget">Target path (file or directory).</param>
     /// <param name="content">Content to write.</param>
@@ -28,36 +29,48 @@ public class OutputFormatter
         _console.WriteLine("\n💾 Writing output...");
 
         var resolvedPath = ResolveOutputPath(outputTarget, defaultFileName);
-        EnsureDirectoryExists(resolvedPath);
-
         var formattedContent = FormatContent(content, format);
-        File.WriteAllText(resolvedPath, formattedContent);
+
+        WriteFile(resolvedPath, formattedContent);
 
         return resolvedPath;
     }
 
-    private static string ResolveOutputPath(string outputTarget, string defaultFileName)
-    {
-        return Directory.Exists(outputTarget)
+    /// <summary>
+    /// Pure function: resolves output path based on target type.
+    /// </summary>
+    private static string ResolveOutputPath(string outputTarget, string defaultFileName) =>
+        Directory.Exists(outputTarget)
             ? Path.Combine(outputTarget, defaultFileName)
             : outputTarget;
-    }
 
-    private static void EnsureDirectoryExists(string filePath)
+    /// <summary>
+    /// I/O operation: ensures directory exists and writes file.
+    /// </summary>
+    private static void WriteFile(string filePath, string content)
     {
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
         }
+
+        File.WriteAllText(filePath, content);
     }
 
-    private static string FormatContent(string content, string format)
-    {
-        return format.ToLower() == "json"
-            ? JsonSerializer.Serialize(
-                new { content, timestamp = DateTime.Now },
-                new JsonSerializerOptions { WriteIndented = true })
+    /// <summary>
+    /// Pure function: formats content based on output format.
+    /// </summary>
+    private static string FormatContent(string content, string format) =>
+        format.Equals("json", StringComparison.OrdinalIgnoreCase)
+            ? SerializeToJson(content)
             : content;
-    }
+
+    /// <summary>
+    /// Pure function: serializes content to JSON with timestamp.
+    /// </summary>
+    private static string SerializeToJson(string content) =>
+        JsonSerializer.Serialize(
+            new { content, timestamp = DateTime.Now },
+            new JsonSerializerOptions { WriteIndented = true });
 }

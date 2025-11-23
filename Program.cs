@@ -2,20 +2,17 @@ using System.Diagnostics;
 using System.Text;
 using CodeContext.Configuration;
 using CodeContext.Services;
+using CodeContext.Utils;
 
 Console.OutputEncoding = Encoding.UTF8;
 
 try
 {
-    // Initialize dependencies
+    // Initialize dependencies using functional composition
     var console = new ConsoleWriter();
     var configLoader = new ConfigLoader(console);
     var pathResolver = new PathResolver(console);
     var filterConfig = new FilterConfiguration();
-    var fileChecker = new FileFilterService(filterConfig);
-    var scanner = new ProjectScanner(fileChecker, console);
-    var contentBuilder = new ContentBuilder(scanner);
-    var outputFormatter = new OutputFormatter(console);
     var statsCalculator = new StatsCalculator();
 
     // Load configuration
@@ -25,6 +22,19 @@ try
     var defaultInputPath = args.FirstOrDefault() ?? config.DefaultInputPath;
     console.Write($"Enter the path to index (default: {defaultInputPath}): ");
     var projectPath = pathResolver.GetInputPath(defaultInputPath);
+
+    // Load GitIgnore patterns for the project (I/O boundary clearly defined)
+    var gitIgnoreParser = GitHelper.FindRepositoryRoot(projectPath) switch
+    {
+        null => GitIgnoreParser.Empty,
+        var gitRoot => GitIgnoreParser.FromFile(Path.Combine(gitRoot, ".gitignore"))
+    };
+
+    // Initialize file checker with immutable GitIgnore parser
+    var fileChecker = new FileFilterService(filterConfig, gitIgnoreParser);
+    var scanner = new ProjectScanner(fileChecker, console);
+    var contentBuilder = new ContentBuilder(scanner);
+    var outputFormatter = new OutputFormatter(console);
 
     // Determine output path
     var folderName = PathResolver.GetFolderName(projectPath);

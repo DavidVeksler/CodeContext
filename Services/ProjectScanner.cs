@@ -1,17 +1,17 @@
-using System.Text;
+using System.Collections.Immutable;
 using CodeContext.Interfaces;
 using CodeContext.Utils;
 
 namespace CodeContext.Services;
 
 /// <summary>
-/// Service for scanning and analyzing project directories.
+/// Functional service for scanning and analyzing project directories.
+/// Uses immutable data structures and separates I/O from pure logic.
 /// </summary>
 public class ProjectScanner
 {
     private readonly IFileChecker _fileChecker;
     private readonly IConsoleWriter _console;
-    private string? _gitRepoRoot;
 
     public ProjectScanner(IFileChecker fileChecker, IConsoleWriter console)
     {
@@ -20,7 +20,7 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Gets user input with a prompt.
+    /// Gets user input with a prompt (pure I/O operation).
     /// </summary>
     /// <param name="prompt">The prompt to display.</param>
     /// <returns>The user's input.</returns>
@@ -28,6 +28,15 @@ public class ProjectScanner
     {
         _console.Write(prompt);
         return _console.ReadLine() ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Represents the context for a scan operation (immutable).
+    /// </summary>
+    private sealed record ScanContext(string RootPath, string GitRepoRoot)
+    {
+        public static ScanContext Create(string projectPath) =>
+            new(projectPath, GitHelper.FindRepositoryRoot(projectPath) ?? projectPath);
     }
 
     /// <summary>
@@ -39,68 +48,103 @@ public class ProjectScanner
     public string GetProjectStructure(string projectPath, int indent = 0)
     {
         Guard.DirectoryExists(projectPath, nameof(projectPath));
-        _gitRepoRoot ??= GitHelper.FindRepositoryRoot(projectPath);
 
         if (indent == 0)
         {
             _console.WriteLine("📁 Analyzing directory structure...");
         }
 
-        var rootPath = _gitRepoRoot ?? projectPath;
+        var context = ScanContext.Create(projectPath);
+        var lines = GetProjectStructureLines(projectPath, context, indent).ToImmutableArray();
 
-        List<string> entries;
+        // Report progress (side effect isolated to specific calls)
+        if (indent == 0 && lines.Length > 0)
+        {
+            _console.Write($"\r⏳ Progress: 100% ({lines.Length}/{lines.Length})");
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>
+    /// Pure recursive function to generate directory structure lines.
+    /// Uses lazy evaluation via yield return.
+    /// </summary>
+    private IEnumerable<string> GetProjectStructureLines(string directoryPath, ScanContext context, int indent)
+    {
+        var entries = GetFilteredEntries(directoryPath, context.GitRepoRoot);
+
+        foreach (var entry in entries)
+        {
+            if (Directory.Exists(entry))
+            {
+                var dir = new DirectoryInfo(entry);
+                yield return FormatDirectoryEntry(dir.Name, indent);
+
+                // Recursively yield subdirectory contents
+                foreach (var line in GetProjectStructureLines(entry, context, indent + 1))
+                {
+                    yield return line;
+                }
+            }
+            else
+            {
+                var file = new FileInfo(entry);
+                yield return FormatFileEntry(file.Name, file.Extension, indent);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Pure function to get filtered and sorted directory entries.
+    /// </summary>
+    private IEnumerable<string> GetFilteredEntries(string directoryPath, string rootPath)
+    {
         try
         {
-            var enumerationOptions = new EnumerationOptions
+            var options = new EnumerationOptions
             {
                 IgnoreInaccessible = true,
                 RecurseSubdirectories = false
             };
 
-            entries = Directory.EnumerateFileSystemEntries(projectPath, "*", enumerationOptions)
+            return Directory.EnumerateFileSystemEntries(directoryPath, "*", options)
                 .OrderBy(e => e)
-                .Where(e =>
-                {
-                    try
-                    {
-                        return !_fileChecker.ShouldSkip(new FileInfo(e), rootPath);
-                    }
-                    catch
-                    {
-                        // Skip entries that can't be accessed
-                        return false;
-                    }
-                })
-                .ToList();
+                .Where(e => ShouldIncludeEntry(e, rootPath));
         }
         catch (Exception ex)
         {
-            _console.WriteLine($"\n⚠️ Warning: Could not enumerate directory {projectPath}: {ex.Message}");
-            return string.Empty;
+            _console.WriteLine($"\n⚠️ Warning: Could not enumerate directory {directoryPath}: {ex.Message}");
+            return Enumerable.Empty<string>();
         }
-
-        var structure = new StringBuilder();
-
-        for (int i = 0; i < entries.Count; i++)
-        {
-            WriteProgress(i + 1, entries.Count);
-            var entry = entries[i];
-
-            if (Directory.Exists(entry))
-            {
-                var dir = new DirectoryInfo(entry);
-                structure.AppendLine($"{new string(' ', indent * 2)}[{dir.Name}/]");
-                structure.Append(GetProjectStructure(entry, indent + 1));
-            }
-            else
-            {
-                var file = new FileInfo(entry);
-                structure.AppendLine($"{new string(' ', indent * 2)}[{file.Extension}] {file.Name}");
-            }
-        }
-
-        return structure.ToString();
     }
+
+    /// <summary>
+    /// Pure predicate to determine if an entry should be included.
+    /// </summary>
+    private bool ShouldIncludeEntry(string entryPath, string rootPath)
+    {
+        try
+        {
+            return !_fileChecker.ShouldSkip(new FileInfo(entryPath), rootPath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Pure function to format a directory entry.
+    /// </summary>
+    private static string FormatDirectoryEntry(string name, int indent) =>
+        $"{new string(' ', indent * 2)}[{name}/]";
+
+    /// <summary>
+    /// Pure function to format a file entry.
+    /// </summary>
+    private static string FormatFileEntry(string name, string extension, int indent) =>
+        $"{new string(' ', indent * 2)}[{extension}] {name}";
 
     /// <summary>
     /// Retrieves the contents of all non-filtered files in the directory tree.
@@ -110,93 +154,137 @@ public class ProjectScanner
     public string GetFileContents(string projectPath)
     {
         Guard.DirectoryExists(projectPath, nameof(projectPath));
-        _gitRepoRoot ??= GitHelper.FindRepositoryRoot(projectPath);
         _console.WriteLine("\n📄 Processing files...");
 
-        var rootPath = _gitRepoRoot ?? projectPath;
-        var files = new List<string>();
+        var context = ScanContext.Create(projectPath);
+        var files = EnumerateFilesRecursively(projectPath, context.GitRepoRoot).ToImmutableArray();
 
-        // Manually enumerate files recursively to respect filters
-        EnumerateFilesRecursively(projectPath, rootPath, files);
-
-        var fileContents = new List<string>();
-        for (int i = 0; i < files.Count; i++)
-        {
-            WriteProgress(i + 1, files.Count);
-            var file = files[i];
-
-            try
+        var fileContents = files
+            .Select((file, index) =>
             {
-                var content = File.ReadAllText(file);
-                fileContents.Add($"{file}\n{new string('-', 100)}\n{content}");
-            }
-            catch (Exception ex)
-            {
-                _console.WriteLine($"\n⚠️ Warning: Could not read file {file}: {ex.Message}");
-            }
-        }
+                WriteProgress(index + 1, files.Length);
+                return ReadFileWithSeparator(file);
+            })
+            .Where(content => content != null)
+            .ToImmutableArray();
 
-        return string.Join("\n\n", fileContents);
+        return string.Join("\n\n", fileContents!);
     }
 
     /// <summary>
-    /// Recursively enumerates files while respecting filter rules.
+    /// Pure recursive function to enumerate all files in directory tree.
+    /// Uses lazy evaluation via yield return.
     /// </summary>
-    private void EnumerateFilesRecursively(string directory, string rootPath, List<string> files)
+    private IEnumerable<string> EnumerateFilesRecursively(string directory, string rootPath)
+    {
+        var options = new EnumerationOptions
+        {
+            IgnoreInaccessible = true,
+            RecurseSubdirectories = false
+        };
+
+        // Yield files in current directory
+        foreach (var file in GetFilteredFiles(directory, rootPath, options))
+        {
+            yield return file;
+        }
+
+        // Recursively yield files from subdirectories
+        foreach (var subDir in GetFilteredDirectories(directory, rootPath, options))
+        {
+            foreach (var file in EnumerateFilesRecursively(subDir, rootPath))
+            {
+                yield return file;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets filtered files from a directory (pure enumeration).
+    /// </summary>
+    private IEnumerable<string> GetFilteredFiles(string directory, string rootPath, EnumerationOptions options)
     {
         try
         {
-            var enumerationOptions = new EnumerationOptions
-            {
-                IgnoreInaccessible = true,
-                RecurseSubdirectories = false
-            };
-
-            // Get files in current directory
-            foreach (var file in Directory.EnumerateFiles(directory, "*", enumerationOptions))
-            {
-                try
-                {
-                    var fileInfo = new FileInfo(file);
-                    if (!_fileChecker.ShouldSkip(fileInfo, rootPath))
-                    {
-                        files.Add(file);
-                    }
-                }
-                catch
-                {
-                    // Skip files that can't be accessed
-                }
-            }
-
-            // Recursively process subdirectories
-            foreach (var subDir in Directory.EnumerateDirectories(directory, "*", enumerationOptions))
-            {
-                try
-                {
-                    var dirInfo = new DirectoryInfo(subDir);
-                    if (!_fileChecker.ShouldSkip(dirInfo, rootPath))
-                    {
-                        EnumerateFilesRecursively(subDir, rootPath, files);
-                    }
-                }
-                catch
-                {
-                    // Skip directories that can't be accessed
-                }
-            }
+            return Directory.EnumerateFiles(directory, "*", options)
+                .Where(file => ShouldIncludeFile(file, rootPath));
         }
         catch (Exception ex)
         {
             _console.WriteLine($"\n⚠️ Warning: Could not enumerate directory {directory}: {ex.Message}");
+            return Enumerable.Empty<string>();
         }
     }
 
     /// <summary>
-    /// Gets the root path of the git repository containing the scanned path.
+    /// Gets filtered subdirectories from a directory (pure enumeration).
     /// </summary>
-    public string? GitRepoRoot => _gitRepoRoot;
+    private IEnumerable<string> GetFilteredDirectories(string directory, string rootPath, EnumerationOptions options)
+    {
+        try
+        {
+            return Directory.EnumerateDirectories(directory, "*", options)
+                .Where(dir => ShouldIncludeDirectory(dir, rootPath));
+        }
+        catch
+        {
+            return Enumerable.Empty<string>();
+        }
+    }
 
+    /// <summary>
+    /// Pure predicate to check if a file should be included.
+    /// </summary>
+    private bool ShouldIncludeFile(string filePath, string rootPath)
+    {
+        try
+        {
+            var fileInfo = new FileInfo(filePath);
+            return !_fileChecker.ShouldSkip(fileInfo, rootPath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Pure predicate to check if a directory should be included.
+    /// </summary>
+    private bool ShouldIncludeDirectory(string dirPath, string rootPath)
+    {
+        try
+        {
+            var dirInfo = new DirectoryInfo(dirPath);
+            return !_fileChecker.ShouldSkip(dirInfo, rootPath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// I/O function to read file with formatted separator.
+    /// Returns null on error for filtering.
+    /// </summary>
+    private string? ReadFileWithSeparator(string filePath)
+    {
+        try
+        {
+            var content = File.ReadAllText(filePath);
+            return $"{filePath}\n{new string('-', 100)}\n{content}";
+        }
+        catch (Exception ex)
+        {
+            _console.WriteLine($"\n⚠️ Warning: Could not read file {filePath}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Side effect: writes progress to console.
+    /// </summary>
     private void WriteProgress(int current, int total)
     {
         var percent = (int)((current / (double)total) * 100);
