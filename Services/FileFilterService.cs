@@ -5,18 +5,27 @@ using CodeContext.Utils;
 namespace CodeContext.Services;
 
 /// <summary>
-/// Service for determining if files and directories should be filtered out during processing.
+/// Functional service for determining if files and directories should be filtered out during processing.
+/// Uses composable predicates and immutable state.
 /// </summary>
 public class FileFilterService : IFileChecker
 {
     private readonly FilterConfiguration _config;
-    private readonly GitIgnoreParser _gitIgnoreParser;
-    private bool _gitIgnoreLoaded;
+    private readonly Lazy<GitIgnoreParser> _gitIgnoreParser;
 
     public FileFilterService(FilterConfiguration config)
     {
         _config = Guard.NotNull(config, nameof(config));
-        _gitIgnoreParser = new GitIgnoreParser();
+        _gitIgnoreParser = new Lazy<GitIgnoreParser>(() => GitIgnoreParser.Empty);
+    }
+
+    /// <summary>
+    /// Creates a FileFilterService with a pre-loaded GitIgnoreParser.
+    /// </summary>
+    public FileFilterService(FilterConfiguration config, GitIgnoreParser gitIgnoreParser)
+    {
+        _config = Guard.NotNull(config, nameof(config));
+        _gitIgnoreParser = new Lazy<GitIgnoreParser>(() => gitIgnoreParser);
     }
 
     public bool ShouldSkip(FileSystemInfo info, string rootPath)
@@ -24,71 +33,55 @@ public class FileFilterService : IFileChecker
         Guard.NotNull(info, nameof(info));
         Guard.NotNullOrEmpty(rootPath, nameof(rootPath));
 
-        // Skip symbolic links and junction points to avoid I/O errors
-        if (info.Attributes.HasFlag(FileAttributes.ReparsePoint))
-        {
-            return true;
-        }
-
-        // Check if any parent directory is in the ignored list
-        var relativePath = Path.GetRelativePath(rootPath, info.FullName);
-        var pathParts = relativePath.Split(Path.DirectorySeparatorChar);
-
-        if (pathParts.Any(_config.IgnoredDirectories.Contains))
-        {
-            return true;
-        }
-
-        if (info.Attributes.HasFlag(FileAttributes.Directory))
-        {
-            return false; // We've already checked if it's an ignored directory
-        }
-
-        // Check for ignored files
-        if (_config.IgnoredFiles.Contains(info.Name))
-        {
-            return true;
-        }
-
-        // Check file extension
-        if (ShouldSkipByExtension(info.Name))
-        {
-            return true;
-        }
-
-        // Check file size
-        if (info is FileInfo fileInfo && fileInfo.Length > _config.MaxFileSizeBytes)
-        {
-            return true;
-        }
-
-        // Check gitignore patterns
-        if (ShouldSkipByGitIgnore(info.FullName, rootPath))
-        {
-            return true;
-        }
-
-        // Check if binary
-        if (FileUtilities.IsBinaryFile(info.FullName, _config.BinaryCheckChunkSize, _config.BinaryThreshold))
-        {
-            return true;
-        }
-
-        // Check for generated code
-        if (IsGeneratedCode(info.FullName))
-        {
-            return true;
-        }
-
-        return false;
+        // Compose filter predicates - each is a pure function or has well-defined side effects
+        return IsReparsePoint(info)
+            || ContainsIgnoredDirectory(info, rootPath)
+            || (IsFile(info) && ShouldSkipFile(info, rootPath));
     }
 
-    private bool ShouldSkipByExtension(string fileName)
+    private static bool IsReparsePoint(FileSystemInfo info) =>
+        info.Attributes.HasFlag(FileAttributes.ReparsePoint);
+
+    private static bool IsFile(FileSystemInfo info) =>
+        !info.Attributes.HasFlag(FileAttributes.Directory);
+
+    private bool ContainsIgnoredDirectory(FileSystemInfo info, string rootPath)
+    {
+        var relativePath = Path.GetRelativePath(rootPath, info.FullName);
+        var pathParts = relativePath.Split(Path.DirectorySeparatorChar);
+        return pathParts.Any(_config.IgnoredDirectories.Contains);
+    }
+
+    private bool ShouldSkipFile(FileSystemInfo info, string rootPath) =>
+        IsIgnoredFileName(info.Name)
+        || ShouldSkipByExtension(info.Name)
+        || IsFileTooLarge(info)
+        || ShouldSkipByGitIgnore(info.FullName, rootPath)
+        || IsBinaryFile(info.FullName)
+        || IsGeneratedCode(info.FullName);
+
+    private bool IsIgnoredFileName(string fileName) =>
+        _config.IgnoredFiles.Contains(fileName);
+
+    private bool IsFileTooLarge(FileSystemInfo info) =>
+        info is FileInfo fileInfo && fileInfo.Length > _config.MaxFileSizeBytes;
+
+    private bool IsBinaryFile(string filePath) =>
+        FileUtilities.IsBinaryFile(filePath, _config.BinaryCheckChunkSize, _config.BinaryThreshold);
+
+    private bool ShouldSkipByExtension(string fileName) =>
+        GetExtensions(fileName).Any(_config.IgnoredExtensions.Contains);
+
+    /// <summary>
+    /// Pure function that extracts both simple and compound extensions from a filename.
+    /// For "file.min.css", returns [".css", ".min.css"]
+    /// </summary>
+    private static IEnumerable<string> GetExtensions(string fileName)
     {
         var extension = Path.GetExtension(fileName);
-        if (_config.IgnoredExtensions.Contains(extension))
+        if (!string.IsNullOrEmpty(extension))
         {
-            return true;
+            yield return extension;
         }
 
         // Check for compound extensions like .min.css
@@ -98,52 +91,47 @@ public class FileFilterService : IFileChecker
             var secondLastDotIndex = fileName.LastIndexOf('.', lastDotIndex - 1);
             if (secondLastDotIndex >= 0)
             {
-                var compoundExtension = fileName.Substring(secondLastDotIndex);
-                if (_config.IgnoredExtensions.Contains(compoundExtension))
-                {
-                    return true;
-                }
+                yield return fileName[secondLastDotIndex..];
             }
         }
-
-        return false;
     }
 
-    private bool ShouldSkipByGitIgnore(string filePath, string rootPath)
+    private bool ShouldSkipByGitIgnore(string filePath, string rootPath) =>
+        GitHelper.FindRepositoryRoot(rootPath) switch
+        {
+            null => false,
+            var repoRoot => IsIgnoredInRepository(filePath, repoRoot)
+        };
+
+    private bool IsIgnoredInRepository(string filePath, string repositoryRoot)
     {
-        if (!GitHelper.IsInRepository(rootPath))
+        var parser = _gitIgnoreParser.Value;
+        if (!parser.HasPatterns)
         {
             return false;
         }
 
-        if (!_gitIgnoreLoaded)
-        {
-            var gitRoot = GitHelper.FindRepositoryRoot(rootPath) ?? rootPath;
-            var gitIgnorePath = Path.Combine(gitRoot, ".gitignore");
-            _gitIgnoreParser.LoadFromFile(gitIgnorePath);
-            _gitIgnoreLoaded = true;
-        }
-
-        if (!_gitIgnoreParser.HasPatterns)
-        {
-            return false;
-        }
-
-        var repositoryRoot = GitHelper.FindRepositoryRoot(rootPath) ?? rootPath;
         var relativePath = Path.GetRelativePath(repositoryRoot, filePath);
-        return _gitIgnoreParser.IsIgnored(relativePath);
+        return parser.IsIgnored(relativePath);
     }
 
-    private bool IsGeneratedCode(string filePath)
+    private bool IsGeneratedCode(string filePath) =>
+        ReadFirstLines(filePath, _config.GeneratedCodeLinesToCheck)
+            .Any(line => line.Contains("<auto-generated />"));
+
+    /// <summary>
+    /// Pure I/O function: reads first N lines from a file.
+    /// Returns empty enumerable on error (isolates exception handling).
+    /// </summary>
+    private static IEnumerable<string> ReadFirstLines(string filePath, int count)
     {
         try
         {
-            var lines = File.ReadLines(filePath).Take(_config.GeneratedCodeLinesToCheck);
-            return lines.Any(line => line.Contains("<auto-generated />"));
+            return File.ReadLines(filePath).Take(count);
         }
         catch
         {
-            return false;
+            return Enumerable.Empty<string>();
         }
     }
 }
