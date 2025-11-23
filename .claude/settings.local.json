@@ -8,7 +8,12 @@
       "Bash(cp:*)",
       "Bash(ls:*)",
       "Bash(dotnet build:*)",
-      "Bash(\"C:\\Users\\veksl\\Projects\\CodeContext\\bin\\Release\\net9.0\\CodeContext.exe\" \"C:\\Users\\veksl\\Projects\\ResumeForge\")"
+      "Bash(\"C:\\Users\\veksl\\Projects\\CodeContext\\bin\\Release\\net9.0\\CodeContext.exe\" \"C:\\Users\\veksl\\Projects\\ResumeForge\")",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet add:*)",
+      "Bash(del CodeContext.TestsUnitTest1.cs)",
+      "Bash(dotnet test:*)"
     ],
     "deny": []
   }
