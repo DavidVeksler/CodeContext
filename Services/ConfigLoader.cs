@@ -44,7 +44,8 @@ public class ConfigLoader
     }
 
     /// <summary>
-    /// Pure function: parses JSON string into AppConfig.
+    /// Parses JSON string into AppConfig.
+    /// Includes console logging side effects on parse errors.
     /// </summary>
     private AppConfig ParseConfig(string json)
     {

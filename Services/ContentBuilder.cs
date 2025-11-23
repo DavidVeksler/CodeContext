@@ -27,7 +27,7 @@ public class ContentBuilder
         string.Join("\n", BuildContentSections(projectPath, config));
 
     /// <summary>
-    /// Pure function that generates content sections based on configuration.
+    /// Generates content sections based on configuration (performs I/O via scanner).
     /// Uses declarative approach with LINQ and immutable collections.
     /// </summary>
     private IEnumerable<string> BuildContentSections(string projectPath, AppConfig config)

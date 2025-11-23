@@ -67,7 +67,7 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Pure recursive function to generate directory structure lines.
+    /// Recursive function to generate directory structure lines (performs I/O).
     /// Uses lazy evaluation via yield return.
     /// </summary>
     private IEnumerable<string> GetProjectStructureLines(string directoryPath, ScanContext context, int indent)
@@ -96,7 +96,8 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Pure function to get filtered and sorted directory entries.
+    /// I/O operation: gets filtered and sorted directory entries.
+    /// Includes console logging side effects on errors.
     /// </summary>
     private IEnumerable<string> GetFilteredEntries(string directoryPath, string rootPath)
     {
@@ -120,7 +121,7 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Pure predicate to determine if an entry should be included.
+    /// Predicate to determine if an entry should be included (may perform I/O).
     /// </summary>
     private bool ShouldIncludeEntry(string entryPath, string rootPath)
     {
@@ -172,7 +173,7 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Pure recursive function to enumerate all files in directory tree.
+    /// Recursive I/O operation to enumerate all files in directory tree.
     /// Uses lazy evaluation via yield return.
     /// </summary>
     private IEnumerable<string> EnumerateFilesRecursively(string directory, string rootPath)
@@ -200,7 +201,8 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Gets filtered files from a directory (pure enumeration).
+    /// I/O operation: gets filtered files from a directory.
+    /// Includes console logging side effects on errors.
     /// </summary>
     private IEnumerable<string> GetFilteredFiles(string directory, string rootPath, EnumerationOptions options)
     {
@@ -217,7 +219,7 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Gets filtered subdirectories from a directory (pure enumeration).
+    /// I/O operation: gets filtered subdirectories from a directory.
     /// </summary>
     private IEnumerable<string> GetFilteredDirectories(string directory, string rootPath, EnumerationOptions options)
     {
@@ -233,7 +235,7 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Pure predicate to check if a file should be included.
+    /// Predicate to check if a file should be included (may perform I/O).
     /// </summary>
     private bool ShouldIncludeFile(string filePath, string rootPath)
     {
@@ -249,7 +251,7 @@ public class ProjectScanner
     }
 
     /// <summary>
-    /// Pure predicate to check if a directory should be included.
+    /// Predicate to check if a directory should be included (may perform I/O).
     /// </summary>
     private bool ShouldIncludeDirectory(string dirPath, string rootPath)
     {

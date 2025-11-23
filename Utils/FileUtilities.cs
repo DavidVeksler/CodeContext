@@ -40,15 +40,15 @@ public static class FileUtilities
     }
 
     /// <summary>
-    /// Pure function: analyzes stream content to determine if binary.
+    /// I/O operation: analyzes stream content to determine if binary.
     /// Checks for UTF-8 BOM first, then analyzes byte patterns.
     /// </summary>
     private static bool IsStreamBinary(FileStream stream, int chunkSize, double threshold) =>
         stream.Length > 0 && !HasUtf8Bom(stream) && HasBinaryContent(stream, chunkSize, threshold);
 
     /// <summary>
-    /// Pure function: checks if stream starts with UTF-8 BOM.
-    /// Resets stream position after checking.
+    /// I/O operation: checks if stream starts with UTF-8 BOM.
+    /// Resets stream position after checking (side effect).
     /// </summary>
     private static bool HasUtf8Bom(FileStream stream)
     {
@@ -65,7 +65,7 @@ public static class FileUtilities
     }
 
     /// <summary>
-    /// Pure function: checks if stream content exceeds binary threshold.
+    /// I/O operation: checks if stream content exceeds binary threshold.
     /// </summary>
     private static bool HasBinaryContent(FileStream stream, int chunkSize, double threshold)
     {

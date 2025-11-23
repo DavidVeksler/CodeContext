@@ -29,7 +29,7 @@ public class OutputFormatter
         _console.WriteLine("\n💾 Writing output...");
 
         var resolvedPath = ResolveOutputPath(outputTarget, defaultFileName);
-        var formattedContent = FormatContent(content, format);
+        var formattedContent = FormatContent(content, format, DateTime.Now);
 
         WriteFile(resolvedPath, formattedContent);
 
@@ -37,7 +37,8 @@ public class OutputFormatter
     }
 
     /// <summary>
-    /// Pure function: resolves output path based on target type.
+    /// I/O operation: resolves output path based on target type.
+    /// Checks if directory exists before combining paths.
     /// </summary>
     private static string ResolveOutputPath(string outputTarget, string defaultFileName) =>
         Directory.Exists(outputTarget)
@@ -61,16 +62,17 @@ public class OutputFormatter
     /// <summary>
     /// Pure function: formats content based on output format.
     /// </summary>
-    private static string FormatContent(string content, string format) =>
+    private static string FormatContent(string content, string format, DateTime timestamp) =>
         format.Equals("json", StringComparison.OrdinalIgnoreCase)
-            ? SerializeToJson(content)
+            ? SerializeToJson(content, timestamp)
             : content;
 
     /// <summary>
-    /// Pure function: serializes content to JSON with timestamp.
+    /// Pure function: serializes content to JSON with provided timestamp.
+    /// Deterministic - same inputs always produce same output.
     /// </summary>
-    private static string SerializeToJson(string content) =>
+    private static string SerializeToJson(string content, DateTime timestamp) =>
         JsonSerializer.Serialize(
-            new { content, timestamp = DateTime.Now },
+            new { content, timestamp },
             new JsonSerializerOptions { WriteIndented = true });
 }
