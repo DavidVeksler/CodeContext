@@ -35,11 +35,11 @@ public class ConfigLoader
         try
         {
             var json = File.Exists(fileName) ? File.ReadAllText(fileName) : "{}";
-            return Result<string>.Success(json);
+            return new Result<string>.Success(json);
         }
         catch (Exception ex)
         {
-            return Result<string>.Error(ex.Message);
+            return new Result<string>.Error(ex.Message);
         }
     }
 

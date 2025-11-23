@@ -58,10 +58,10 @@ public static class FileUtilities
         }
 
         var bom = new byte[Utf8Bom.Length];
-        stream.Read(bom, 0, Utf8Bom.Length);
+        var bytesRead = stream.Read(bom, 0, Utf8Bom.Length);
         stream.Position = 0;
 
-        return bom.SequenceEqual(Utf8Bom);
+        return bytesRead == Utf8Bom.Length && bom.SequenceEqual(Utf8Bom);
     }
 
     /// <summary>
