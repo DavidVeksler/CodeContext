@@ -39,7 +39,7 @@ public static class GitHelper
             };
 
     /// <summary>
-    /// Pure predicate: checks if a directory contains a .git subdirectory.
+    /// I/O operation: checks if a directory contains a .git subdirectory.
     /// </summary>
     private static bool HasGitDirectory(string path) =>
         Directory.Exists(Path.Combine(path, ".git"));

@@ -54,8 +54,8 @@ public class PathResolver
         string.IsNullOrWhiteSpace(userInput) ? defaultPath : userInput;
 
     /// <summary>
-    /// Pure function: extracts a clean folder name from the input path for output file naming.
-    /// Uses functional composition to handle edge cases.
+    /// Extracts a clean folder name from the input path for output file naming.
+    /// Uses functional composition to handle edge cases. May perform I/O.
     /// </summary>
     /// <param name="path">The input path.</param>
     /// <returns>A sanitized folder name.</returns>
@@ -65,7 +65,7 @@ public class PathResolver
         ?? (IsPathSeparatorTerminated(path) ? ExtractRootFolderName(path) ?? "root" : "root");
 
     /// <summary>
-    /// Pure function: attempts to get directory name from path.
+    /// Attempts to get directory name from path (may perform I/O).
     /// Returns null if invalid or current directory marker.
     /// </summary>
     private static string? TryGetDirectoryName(string path)
@@ -88,7 +88,7 @@ public class PathResolver
         path.EndsWith(Path.AltDirectorySeparatorChar);
 
     /// <summary>
-    /// Pure function: extracts root folder name from path.
+    /// Extracts root folder name from path (may perform I/O).
     /// Removes path separators and drive colons.
     /// </summary>
     private static string? ExtractRootFolderName(string path) =>
