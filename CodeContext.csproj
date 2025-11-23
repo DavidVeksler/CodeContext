@@ -8,4 +8,9 @@
   <ItemGroup>
     <PackageReference Include="DotNet.Glob" Version="3.1.3" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="CodeContext.Tests\**" />
+    <EmbeddedResource Remove="CodeContext.Tests\**" />
+    <None Remove="CodeContext.Tests\**" />
+  </ItemGroup>
 </Project>

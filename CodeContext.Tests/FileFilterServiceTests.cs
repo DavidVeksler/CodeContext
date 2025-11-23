@@ -1,0 +1,267 @@
+using CodeContext.Configuration;
+using CodeContext.Services;
+using Xunit;
+
+namespace CodeContext.Tests;
+
+/// <summary>
+/// Tests for the FileFilterService class that handles file and directory filtering.
+/// </summary>
+public class FileFilterServiceTests : IDisposable
+{
+    private readonly FilterConfiguration _config;
+    private readonly FileFilterService _service;
+    private readonly string _tempRoot;
+
+    public FileFilterServiceTests()
+    {
+        _config = new FilterConfiguration();
+        _service = new FileFilterService(_config);
+        _tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(_tempRoot);
+    }
+
+    [Fact]
+    public void ShouldSkip_WithNullFileSystemInfo_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            _service.ShouldSkip(null!, _tempRoot));
+    }
+
+    [Fact]
+    public void ShouldSkip_WithNullRootPath_ThrowsArgumentException()
+    {
+        // Arrange
+        var tempFile = Path.Combine(_tempRoot, "test.txt");
+        File.WriteAllText(tempFile, "test");
+        var fileInfo = new FileInfo(tempFile);
+
+        try
+        {
+            // Act & Assert
+            Assert.Throws<ArgumentException>(() =>
+                _service.ShouldSkip(fileInfo, null!));
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithIgnoredExtension_ReturnsTrue()
+    {
+        // Arrange
+        var tempFile = Path.Combine(_tempRoot, "test.exe");
+        File.WriteAllText(tempFile, "test");
+        var fileInfo = new FileInfo(tempFile);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(fileInfo, _tempRoot);
+
+            // Assert
+            Assert.True(result);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithAllowedExtension_ReturnsFalse()
+    {
+        // Arrange
+        var tempFile = Path.Combine(_tempRoot, "test.cs");
+        File.WriteAllText(tempFile, "// C# code");
+        var fileInfo = new FileInfo(tempFile);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(fileInfo, _tempRoot);
+
+            // Assert
+            Assert.False(result);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithIgnoredFileName_ReturnsTrue()
+    {
+        // Arrange
+        var tempFile = Path.Combine(_tempRoot, ".gitignore");
+        File.WriteAllText(tempFile, "test");
+        var fileInfo = new FileInfo(tempFile);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(fileInfo, _tempRoot);
+
+            // Assert
+            Assert.True(result);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithIgnoredDirectory_ReturnsTrue()
+    {
+        // Arrange
+        var ignoredDir = Path.Combine(_tempRoot, "node_modules");
+        Directory.CreateDirectory(ignoredDir);
+        var fileInIgnoredDir = Path.Combine(ignoredDir, "package.js");
+        File.WriteAllText(fileInIgnoredDir, "test");
+        var fileInfo = new FileInfo(fileInIgnoredDir);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(fileInfo, _tempRoot);
+
+            // Assert
+            Assert.True(result);
+        }
+        finally
+        {
+            Directory.Delete(ignoredDir, true);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithFileTooLarge_ReturnsTrue()
+    {
+        // Arrange
+        var tempFile = Path.Combine(_tempRoot, "large.txt");
+        var largeContent = new string('x', (int)_config.MaxFileSizeBytes + 1);
+        File.WriteAllText(tempFile, largeContent);
+        var fileInfo = new FileInfo(tempFile);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(fileInfo, _tempRoot);
+
+            // Assert
+            Assert.True(result);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithCompoundExtension_ReturnsTrue()
+    {
+        // Arrange
+        var tempFile = Path.Combine(_tempRoot, "app.min.js");
+        File.WriteAllText(tempFile, "minified js");
+        var fileInfo = new FileInfo(tempFile);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(fileInfo, _tempRoot);
+
+            // Assert
+            Assert.True(result);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithGeneratedCodeMarker_ReturnsTrue()
+    {
+        // Arrange
+        var tempFile = Path.Combine(_tempRoot, "Generated.cs");
+        File.WriteAllText(tempFile, "// <auto-generated />\nnamespace Test { }");
+        var fileInfo = new FileInfo(tempFile);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(fileInfo, _tempRoot);
+
+            // Assert
+            Assert.True(result);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithDirectory_ChecksForIgnoredDirectoryNames()
+    {
+        // Arrange
+        var ignoredDir = Path.Combine(_tempRoot, "bin");
+        Directory.CreateDirectory(ignoredDir);
+        var dirInfo = new DirectoryInfo(ignoredDir);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(dirInfo, _tempRoot);
+
+            // Assert
+            Assert.True(result);
+        }
+        finally
+        {
+            Directory.Delete(ignoredDir);
+        }
+    }
+
+    [Fact]
+    public void ShouldSkip_WithNormalDirectory_ReturnsFalse()
+    {
+        // Arrange
+        var normalDir = Path.Combine(_tempRoot, "src");
+        Directory.CreateDirectory(normalDir);
+        var dirInfo = new DirectoryInfo(normalDir);
+
+        try
+        {
+            // Act
+            var result = _service.ShouldSkip(dirInfo, _tempRoot);
+
+            // Assert
+            Assert.False(result);
+        }
+        finally
+        {
+            Directory.Delete(normalDir);
+        }
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Directory.Exists(_tempRoot))
+            {
+                Directory.Delete(_tempRoot, true);
+            }
+        }
+        catch
+        {
+            // Best effort cleanup
+        }
+    }
+}
