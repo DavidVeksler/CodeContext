@@ -10,6 +10,10 @@ namespace CodeContext.Services;
 /// </summary>
 public class TokenBudgetOptimizer
 {
+    // Token reservation constants
+    private const int StructureTokenReservation = 1000; // Reasonable estimate for project structure
+    private const int MinimalOverhead = 100; // Minimal overhead for formatting
+
     public enum SelectionStrategy
     {
         /// <summary>
@@ -69,7 +73,7 @@ public class TokenBudgetOptimizer
         }
 
         // Reserve tokens for project structure if requested
-        var reservedTokens = includeStructure ? 2000 : 100; // Structure + overhead
+        var reservedTokens = includeStructure ? StructureTokenReservation : MinimalOverhead;
         var availableBudget = Math.Max(0, tokenBudget - reservedTokens);
 
         var selected = strategy switch
