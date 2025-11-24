@@ -27,7 +27,7 @@ public class CodeContextTools
     /// </summary>
     [McpServerTool]
     [Description("Get optimized code context for a task. Intelligently selects most relevant files within token budget.")]
-    public async Task<string> GetCodeContext(
+    public string GetCodeContext(
         [Description("Path to the project directory to analyze")] string projectPath,
         [Description("Description of the task (e.g., 'fix authentication bug', 'add payment feature')")] string taskDescription,
         [Description("Maximum number of tokens to use (default: 50000)")] int tokenBudget = 50000,
@@ -58,8 +58,8 @@ public class CodeContextTools
                 ? s
                 : TokenBudgetOptimizer.SelectionStrategy.ValueOptimized;
 
-            // Scan and score files
-            var files = await Task.Run(() => GetAllProjectFiles(scanner, projectPath));
+            // Scan and score files (synchronous I/O, no Task.Run needed)
+            var files = GetAllProjectFiles(scanner, projectPath);
             var scoredFiles = files
                 .Select(f => scorer.ScoreFile(f.path, f.content, taskDescription))
                 .ToList();
@@ -152,7 +152,7 @@ public class CodeContextTools
     /// </summary>
     [McpServerTool]
     [Description("List all files in a project with token counts and basic metadata")]
-    public async Task<string> ListProjectFiles(
+    public string ListProjectFiles(
         [Description("Path to the project directory")] string projectPath,
         [Description("Optional query to filter/rank files")] string? query = null)
     {
@@ -170,7 +170,8 @@ public class CodeContextTools
             var fileChecker = new FileFilterService(filterConfig, gitIgnoreParser);
             var scanner = new ProjectScanner(fileChecker, _console);
 
-            var files = await Task.Run(() => GetAllProjectFiles(scanner, projectPath));
+            // Synchronous I/O, no Task.Run needed
+            var files = GetAllProjectFiles(scanner, projectPath);
 
             var output = new StringBuilder();
             output.AppendLine($"# Project Files: {Path.GetFileName(projectPath)}");
@@ -240,7 +241,14 @@ public class CodeContextTools
 
             foreach (var relativePath in paths)
             {
-                var fullPath = Path.Combine(projectPath, relativePath);
+                // Validate path to prevent path traversal attacks
+                if (!PathSecurity.TryValidatePathWithinRoot(projectPath, relativePath, out var fullPath))
+                {
+                    output.AppendLine($"## {relativePath}");
+                    output.AppendLine("❌ Security error: Path traversal detected");
+                    output.AppendLine();
+                    continue;
+                }
 
                 if (!File.Exists(fullPath))
                 {
@@ -312,16 +320,24 @@ public class CodeContextTools
                         var relativePath = Path.GetRelativePath(rootPath, entry);
                         files.Add((relativePath, content));
                     }
-                    catch
+                    catch (UnauthorizedAccessException)
                     {
-                        // Skip files that can't be read
+                        // Skip files with permission issues
+                    }
+                    catch (IOException)
+                    {
+                        // Skip files that are locked or in use
                     }
                 }
             }
         }
-        catch
+        catch (UnauthorizedAccessException)
         {
-            // Skip directories that can't be accessed
+            // Skip directories with permission issues
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // Skip if directory was deleted during scan
         }
     }
 }
