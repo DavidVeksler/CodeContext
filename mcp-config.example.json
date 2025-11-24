@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "codecontext": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "/path/to/CodeContext/CodeContext.csproj",
+        "--",
+        "--mcp"
+      ],
+      "description": "CodeContext MCP Server - Intelligent code context generation with token budget optimization"
+    }
+  }
+}
