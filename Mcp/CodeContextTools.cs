@@ -299,11 +299,12 @@ public class CodeContextTools
     {
         try
         {
+            var fileCheckerField = scanner.GetType()
+                .GetField("_fileChecker", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var fileChecker = fileCheckerField?.GetValue(scanner) as IFileChecker;
+
             var entries = Directory.EnumerateFileSystemEntries(currentPath)
-                .Where(e => !scanner.GetType()
-                    .GetField("_fileChecker", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-                    .GetValue(scanner) is IFileChecker checker ||
-                    !checker.ShouldSkip(new FileInfo(e), rootPath))
+                .Where(e => fileChecker == null || !fileChecker.ShouldSkip(new FileInfo(e), rootPath))
                 .ToList();
 
             foreach (var entry in entries)
