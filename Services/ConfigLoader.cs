@@ -7,15 +7,10 @@ namespace CodeContext.Services;
 /// <summary>
 /// Functional configuration loader with separated I/O and parsing logic.
 /// </summary>
-public class ConfigLoader
+public class ConfigLoader(IConsoleWriter console)
 {
     private const string ConfigFileName = "config.json";
-    private readonly IConsoleWriter _console;
-
-    public ConfigLoader(IConsoleWriter console)
-    {
-        _console = console;
-    }
+    private readonly IConsoleWriter _console = console;
 
     /// <summary>
     /// Loads configuration from config.json if it exists, otherwise returns default configuration.

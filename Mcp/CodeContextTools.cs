@@ -13,14 +13,9 @@ namespace CodeContext.Mcp;
 /// Provides intelligent code context generation with token budget optimization.
 /// </summary>
 [McpServerToolType]
-public class CodeContextTools
+public class CodeContextTools(IConsoleWriter console)
 {
-    private readonly IConsoleWriter _console;
-
-    public CodeContextTools(IConsoleWriter console)
-    {
-        _console = console;
-    }
+    private readonly IConsoleWriter _console = console;
 
     /// <summary>
     /// Gets optimized code context for a specific task within a token budget.
@@ -281,64 +276,5 @@ public class CodeContextTools
     /// </summary>
     private static List<(string path, string content)> GetAllProjectFiles(
         ProjectScanner scanner,
-        string projectPath)
-    {
-        var files = new List<(string path, string content)>();
-        var context = GitHelper.FindRepositoryRoot(projectPath) ?? projectPath;
-
-        CollectFiles(scanner, projectPath, context, files);
-
-        return files;
-    }
-
-    private static void CollectFiles(
-        ProjectScanner scanner,
-        string currentPath,
-        string rootPath,
-        List<(string path, string content)> files)
-    {
-        try
-        {
-            var fileCheckerField = scanner.GetType()
-                .GetField("_fileChecker", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var fileChecker = fileCheckerField?.GetValue(scanner) as IFileChecker;
-
-            var entries = Directory.EnumerateFileSystemEntries(currentPath)
-                .Where(e => fileChecker == null || !fileChecker.ShouldSkip(new FileInfo(e), rootPath))
-                .ToList();
-
-            foreach (var entry in entries)
-            {
-                if (Directory.Exists(entry))
-                {
-                    CollectFiles(scanner, entry, rootPath, files);
-                }
-                else if (File.Exists(entry))
-                {
-                    try
-                    {
-                        var content = File.ReadAllText(entry);
-                        var relativePath = Path.GetRelativePath(rootPath, entry);
-                        files.Add((relativePath, content));
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                        // Skip files with permission issues
-                    }
-                    catch (IOException)
-                    {
-                        // Skip files that are locked or in use
-                    }
-                }
-            }
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Skip directories with permission issues
-        }
-        catch (DirectoryNotFoundException)
-        {
-            // Skip if directory was deleted during scan
-        }
-    }
+        string projectPath) => scanner.GetAllFiles(projectPath);
 }

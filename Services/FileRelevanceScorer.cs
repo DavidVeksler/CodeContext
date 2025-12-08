@@ -7,7 +7,7 @@ namespace CodeContext.Services;
 /// Scores files based on relevance to a query or task description.
 /// Uses keyword matching, path analysis, and file characteristics.
 /// </summary>
-public class FileRelevanceScorer
+public class FileRelevanceScorer(string projectPath)
 {
     // Scoring weights for different factors
     private const double FileNameWeight = 0.30;
@@ -28,12 +28,7 @@ public class FileRelevanceScorer
     private const double IndexFileBoost = 0.15;
     private const double TestFileBoost = 0.1;
 
-    private readonly string _projectPath;
-
-    public FileRelevanceScorer(string projectPath)
-    {
-        _projectPath = Guard.NotNullOrEmpty(projectPath, nameof(projectPath));
-    }
+    private readonly string _projectPath = Guard.NotNullOrEmpty(projectPath, nameof(projectPath));
 
     /// <summary>
     /// Represents a scored file with relevance information.
@@ -55,7 +50,7 @@ public class FileRelevanceScorer
     /// <returns>Scored file with relevance score between 0 and 1.</returns>
     public ScoredFile ScoreFile(string filePath, string content, string query)
     {
-        var breakdown = new Dictionary<string, double>();
+        Dictionary<string, double> breakdown = [];
         var keywords = ExtractKeywords(query);
 
         // 1. File name relevance (30% weight)
@@ -92,10 +87,10 @@ public class FileRelevanceScorer
     private static List<string> ExtractKeywords(string query)
     {
         if (string.IsNullOrWhiteSpace(query))
-            return new List<string>();
+            return [];
 
         // Remove common words and split into keywords
-        var commonWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        HashSet<string> commonWords = new(StringComparer.OrdinalIgnoreCase)
         {
             "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
             "of", "with", "by", "from", "as", "is", "was", "are", "were", "be",

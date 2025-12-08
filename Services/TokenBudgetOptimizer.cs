@@ -62,8 +62,8 @@ public class TokenBudgetOptimizer
 
         if (tokenBudget <= 0)
         {
-            return new OptimizationResult(
-                ImmutableArray<ScoredFile>.Empty,
+            return new(
+                [],
                 scoredFiles.ToImmutableArray(),
                 0,
                 tokenBudget,
@@ -91,7 +91,7 @@ public class TokenBudgetOptimizer
             ? selectedArray.Average(f => f.RelevanceScore)
             : 0.0;
 
-        return new OptimizationResult(
+        return new(
             selectedArray,
             excludedArray,
             totalTokens,
@@ -108,7 +108,7 @@ public class TokenBudgetOptimizer
         IEnumerable<ScoredFile> files,
         int budget)
     {
-        var selected = new List<ScoredFile>();
+        List<ScoredFile> selected = [];
         var remainingBudget = budget;
 
         foreach (var file in files.OrderByDescending(f => f.RelevanceScore))
@@ -133,16 +133,12 @@ public class TokenBudgetOptimizer
         IEnumerable<ScoredFile> files,
         int budget)
     {
-        var selected = new List<ScoredFile>();
+        List<ScoredFile> selected = [];
         var remainingBudget = budget;
 
-        // Calculate value ratio: relevance / tokens
+        // Calculate value ratio: relevance / tokens (using tuples)
         var valueRanked = files
-            .Select(f => new
-            {
-                File = f,
-                ValueRatio = f.TokenCount > 0 ? f.RelevanceScore / f.TokenCount : 0
-            })
+            .Select(f => (File: f, ValueRatio: f.TokenCount > 0 ? f.RelevanceScore / f.TokenCount : 0))
             .OrderByDescending(x => x.ValueRatio)
             .ToList();
 
@@ -168,7 +164,7 @@ public class TokenBudgetOptimizer
         IEnumerable<ScoredFile> files,
         int budget)
     {
-        var selected = new List<ScoredFile>();
+        List<ScoredFile> selected = [];
         var filesList = files.ToList();
         var remainingBudget = budget;
 

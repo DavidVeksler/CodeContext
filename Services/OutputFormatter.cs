@@ -6,14 +6,9 @@ namespace CodeContext.Services;
 /// <summary>
 /// Functional output formatter with separated I/O and formatting logic.
 /// </summary>
-public class OutputFormatter
+public class OutputFormatter(IConsoleWriter console)
 {
-    private readonly IConsoleWriter _console;
-
-    public OutputFormatter(IConsoleWriter console)
-    {
-        _console = console;
-    }
+    private readonly IConsoleWriter _console = console;
 
     /// <summary>
     /// Writes content to the specified output location (I/O operation).

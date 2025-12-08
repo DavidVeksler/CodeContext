@@ -7,14 +7,9 @@ namespace CodeContext.Services;
 /// Resolves and validates input and output paths with user interaction.
 /// Separates pure path operations from I/O side effects.
 /// </summary>
-public class PathResolver
+public class PathResolver(IConsoleWriter console)
 {
-    private readonly IConsoleWriter _console;
-
-    public PathResolver(IConsoleWriter console)
-    {
-        _console = console;
-    }
+    private readonly IConsoleWriter _console = console;
 
     /// <summary>
     /// Gets and validates the input directory path (I/O operation).

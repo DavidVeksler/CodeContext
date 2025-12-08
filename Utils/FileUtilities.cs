@@ -57,8 +57,8 @@ public static class FileUtilities
             return false;
         }
 
-        var bom = new byte[Utf8Bom.Length];
-        var bytesRead = stream.Read(bom, 0, Utf8Bom.Length);
+        Span<byte> bom = stackalloc byte[Utf8Bom.Length];
+        var bytesRead = stream.Read(bom);
         stream.Position = 0;
 
         return bytesRead == Utf8Bom.Length && bom.SequenceEqual(Utf8Bom);
@@ -69,17 +69,25 @@ public static class FileUtilities
     /// </summary>
     private static bool HasBinaryContent(FileStream stream, int chunkSize, double threshold)
     {
-        var buffer = new byte[chunkSize];
-        var bytesRead = stream.Read(buffer, 0, chunkSize);
+        Span<byte> buffer = stackalloc byte[chunkSize];
+        var bytesRead = stream.Read(buffer);
 
-        return bytesRead > 0 && CalculateBinaryRatio(buffer, bytesRead) > threshold;
+        return bytesRead > 0 && CalculateBinaryRatio(buffer[..bytesRead]) > threshold;
     }
 
     /// <summary>
     /// Pure function: calculates ratio of binary bytes in buffer.
     /// </summary>
-    private static double CalculateBinaryRatio(byte[] buffer, int length) =>
-        (double)buffer.Take(length).Count(IsBinaryByte) / length;
+    private static double CalculateBinaryRatio(ReadOnlySpan<byte> buffer)
+    {
+        var binaryCount = 0;
+        foreach (var b in buffer)
+        {
+            if (IsBinaryByte(b))
+                binaryCount++;
+        }
+        return (double)binaryCount / buffer.Length;
+    }
 
     /// <summary>
     /// Pure predicate: determines if a byte is non-printable (binary).

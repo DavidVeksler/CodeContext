@@ -33,17 +33,15 @@ public class FileFilterService : IFileChecker
         Guard.NotNull(info, nameof(info));
         Guard.NotNullOrEmpty(rootPath, nameof(rootPath));
 
-        // Compose filter predicates - each is a pure function or has well-defined side effects
-        return IsReparsePoint(info)
-            || ContainsIgnoredDirectory(info, rootPath)
-            || (IsFile(info) && ShouldSkipFile(info, rootPath));
+        // Use pattern matching for more expressive filtering
+        return info switch
+        {
+            { Attributes: var attr } when attr.HasFlag(FileAttributes.ReparsePoint) => true,
+            _ when ContainsIgnoredDirectory(info, rootPath) => true,
+            FileInfo file => ShouldSkipFile(file, rootPath),
+            _ => false
+        };
     }
-
-    private static bool IsReparsePoint(FileSystemInfo info) =>
-        info.Attributes.HasFlag(FileAttributes.ReparsePoint);
-
-    private static bool IsFile(FileSystemInfo info) =>
-        !info.Attributes.HasFlag(FileAttributes.Directory);
 
     private bool ContainsIgnoredDirectory(FileSystemInfo info, string rootPath)
     {
@@ -52,19 +50,13 @@ public class FileFilterService : IFileChecker
         return pathParts.Any(_config.IgnoredDirectories.Contains);
     }
 
-    private bool ShouldSkipFile(FileSystemInfo info, string rootPath) =>
-        IsIgnoredFileName(info.Name)
-        || ShouldSkipByExtension(info.Name)
-        || IsFileTooLarge(info)
-        || ShouldSkipByGitIgnore(info.FullName, rootPath)
-        || IsBinaryFile(info.FullName)
-        || IsGeneratedCode(info.FullName);
-
-    private bool IsIgnoredFileName(string fileName) =>
-        _config.IgnoredFiles.Contains(fileName);
-
-    private bool IsFileTooLarge(FileSystemInfo info) =>
-        info is FileInfo fileInfo && fileInfo.Length > _config.MaxFileSizeBytes;
+    private bool ShouldSkipFile(FileInfo file, string rootPath) =>
+        _config.IgnoredFiles.Contains(file.Name)
+        || ShouldSkipByExtension(file.Name)
+        || file.Length > _config.MaxFileSizeBytes
+        || ShouldSkipByGitIgnore(file.FullName, rootPath)
+        || IsBinaryFile(file.FullName)
+        || IsGeneratedCode(file.FullName);
 
     private bool IsBinaryFile(string filePath) =>
         FileUtilities.IsBinaryFile(filePath, _config.BinaryCheckChunkSize, _config.BinaryThreshold);

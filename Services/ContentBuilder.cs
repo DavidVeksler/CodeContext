@@ -7,14 +7,9 @@ namespace CodeContext.Services;
 /// Builds project context content using functional composition.
 /// Separates content generation from assembly.
 /// </summary>
-public class ContentBuilder
+public class ContentBuilder(ProjectScanner scanner)
 {
-    private readonly ProjectScanner _scanner;
-
-    public ContentBuilder(ProjectScanner scanner)
-    {
-        _scanner = scanner;
-    }
+    private readonly ProjectScanner _scanner = scanner;
 
     /// <summary>
     /// Builds the complete content output including structure and file contents.

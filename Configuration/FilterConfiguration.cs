@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace CodeContext.Configuration;
 
 /// <summary>
@@ -13,7 +15,7 @@ public class FilterConfiguration
     /// <summary>
     /// File extensions to ignore during processing.
     /// </summary>
-    public HashSet<string> IgnoredExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase)
+    public FrozenSet<string> IgnoredExtensions { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         // Executable and library files
         ".exe", ".dll", ".pdb", ".bin", ".obj", ".lib", ".so", ".dylib", ".a", ".o",
@@ -107,12 +109,12 @@ public class FilterConfiguration
         ".bat", ".sh", ".cmd", ".ps1",
 
         ".sql"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Directory names to ignore during processing.
     /// </summary>
-    public HashSet<string> IgnoredDirectories { get; init; } = new(StringComparer.OrdinalIgnoreCase)
+    public FrozenSet<string> IgnoredDirectories { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         ".sonarqube",
 
@@ -243,18 +245,18 @@ public class FilterConfiguration
 
         // Pipenv
         ".venv"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// File names to ignore during processing.
     /// </summary>
-    public HashSet<string> IgnoredFiles { get; init; } = new(StringComparer.OrdinalIgnoreCase)
+    public FrozenSet<string> IgnoredFiles { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         ".bzrignore", ".coveragerc", ".editorconfig", ".env", ".env.development",
         ".env.production", ".env.local", ".env.test", ".eslintrc", ".gitattributes",
         "thumbs.db", "desktop.ini", ".DS_Store", "npm-debug.log", "yarn-error.log",
         "package-lock.json", "yarn.lock", "composer.lock", ".gitignore"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Number of lines to check for generated code markers.

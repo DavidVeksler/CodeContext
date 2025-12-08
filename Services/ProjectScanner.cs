@@ -8,16 +8,10 @@ namespace CodeContext.Services;
 /// Functional service for scanning and analyzing project directories.
 /// Uses immutable data structures and separates I/O from pure logic.
 /// </summary>
-public class ProjectScanner
+public class ProjectScanner(IFileChecker fileChecker, IConsoleWriter console)
 {
-    private readonly IFileChecker _fileChecker;
-    private readonly IConsoleWriter _console;
-
-    public ProjectScanner(IFileChecker fileChecker, IConsoleWriter console)
-    {
-        _fileChecker = Guard.NotNull(fileChecker, nameof(fileChecker));
-        _console = Guard.NotNull(console, nameof(console));
-    }
+    private readonly IFileChecker _fileChecker = Guard.NotNull(fileChecker, nameof(fileChecker));
+    private readonly IConsoleWriter _console = Guard.NotNull(console, nameof(console));
 
     /// <summary>
     /// Gets user input with a prompt (pure I/O operation).
@@ -291,5 +285,68 @@ public class ProjectScanner
     {
         var percent = (int)((current / (double)total) * 100);
         _console.Write($"\r⏳ Progress: {percent}% ({current}/{total})");
+    }
+
+    /// <summary>
+    /// Gets all files in the project directory tree with their contents.
+    /// </summary>
+    /// <param name="projectPath">The directory path to scan.</param>
+    /// <returns>List of tuples containing (relative path, content) for each file.</returns>
+    public List<(string path, string content)> GetAllFiles(string projectPath)
+    {
+        Guard.DirectoryExists(projectPath, nameof(projectPath));
+
+        var context = ScanContext.Create(projectPath);
+        var files = new List<(string path, string content)>();
+
+        CollectAllFiles(projectPath, context.GitRepoRoot, files);
+
+        return files;
+    }
+
+    /// <summary>
+    /// Recursively collects all files with their contents.
+    /// </summary>
+    private void CollectAllFiles(string currentPath, string rootPath, List<(string path, string content)> files)
+    {
+        try
+        {
+            var entries = Directory.EnumerateFileSystemEntries(currentPath)
+                .Where(e => ShouldIncludeEntry(e, rootPath))
+                .ToList();
+
+            foreach (var entry in entries)
+            {
+                if (Directory.Exists(entry))
+                {
+                    CollectAllFiles(entry, rootPath, files);
+                }
+                else if (File.Exists(entry))
+                {
+                    try
+                    {
+                        var content = File.ReadAllText(entry);
+                        var relativePath = Path.GetRelativePath(rootPath, entry);
+                        files.Add((relativePath, content));
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        // Skip files with permission issues
+                    }
+                    catch (IOException)
+                    {
+                        // Skip files that are locked or in use
+                    }
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Skip directories with permission issues
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // Skip if directory was deleted during scan
+        }
     }
 }
