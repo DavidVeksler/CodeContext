@@ -13,7 +13,8 @@
       "Bash(dotnet sln:*)",
       "Bash(dotnet add:*)",
       "Bash(del CodeContext.TestsUnitTest1.cs)",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "Bash(dir \"C:\\Projects\\CodeContext\\Services\")"
     ],
     "deny": []
   }
