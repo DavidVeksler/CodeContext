@@ -244,7 +244,15 @@ public class FilterConfiguration
         "charts",
 
         // Pipenv
-        ".venv"
+        ".venv",
+
+        // ReSharper
+        ".tools",
+
+        // Claude/Codex:
+        ".claude", ".codex"
+
+
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
