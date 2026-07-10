@@ -1,6 +1,10 @@
 # CodeContext
 
-CodeContext is a cross-platform CLI tool and MCP (Model Context Protocol) server for Mac, Windows, and Linux that provides intelligent code context to Language Learning Models (LLMs) and agentic coding tools.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
+[![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/download/dotnet/9.0)
+[![C#](https://img.shields.io/badge/language-C%23-239120)](https://learn.microsoft.com/en-us/dotnet/csharp/)
+
+CodeContext is a cross-platform C# CLI tool and MCP (Model Context Protocol) server for Mac, Windows, and Linux that turns a codebase into text for an LLM to see its context. It's a code context tool built for prompt engineering: feed a project straight into ChatGPT, Claude, or any other LLM-based coding assistant without manually copy-pasting files.
 
 It scans project directories, generates a structured representation of the project, and extracts relevant file contents while intelligently filtering out unnecessary files and directories. Now with **token budget optimization** and **relevance-based file selection** for agentic coding workflows!
 
