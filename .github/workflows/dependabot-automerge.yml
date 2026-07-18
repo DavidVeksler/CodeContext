@@ -29,7 +29,10 @@ jobs:
         run: |
           stable_passes=0
           for attempt in {1..120}; do
-            checks="$(gh pr checks "$PR_URL" --json name,bucket 2>/dev/null || echo '[]')"
+            checks="$(gh pr checks "$PR_URL" --json name,bucket 2>/dev/null || true)"
+            if [[ -z "$checks" ]]; then
+              checks='[]'
+            fi
             checks="$(jq '[.[] | select(.name != "dependabot-auto-merge")]' <<<"$checks")"
             count="$(jq 'length' <<<"$checks")"
             failed="$(jq '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length' <<<"$checks")"
