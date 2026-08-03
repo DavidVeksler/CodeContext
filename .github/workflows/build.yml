@@ -28,7 +28,7 @@ jobs:
     - name: Publish
       run: dotnet publish --configuration Release --output ./publish --runtime ${{ matrix.os == 'ubuntu-latest' && 'linux-x64' || matrix.os == 'windows-latest' && 'win-x64' || 'osx-x64' }} --self-contained true
     - name: Archive production artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: dist-${{ matrix.os }}
         path: publish
